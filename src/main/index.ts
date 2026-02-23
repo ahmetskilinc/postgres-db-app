@@ -1,0 +1,106 @@
+import { app, BrowserWindow, nativeTheme } from 'electron'
+
+app.setName('PG App')
+import { join } from 'path'
+import updaterPkg from 'electron-updater'
+const { autoUpdater } = updaterPkg
+import { registerConnectionHandlers } from './ipc/connection'
+import { registerQueryHandlers } from './ipc/query'
+import { registerSchemaHandlers } from './ipc/schema'
+import { registerExportHandlers } from './ipc/export'
+import { registerHistoryHandlers } from './ipc/history'
+import { registerSettingsHandlers, applyStoredTheme } from './ipc/settings'
+import { buildAppMenu } from './menu'
+import { disconnectAll } from './db/client'
+
+const isDev = process.env['NODE_ENV'] !== 'production' && !!process.env['ELECTRON_RENDERER_URL']
+
+function createWindow(): BrowserWindow {
+  const win = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    minWidth: 900,
+    minHeight: 600,
+    show: false,
+    titleBarStyle: 'hiddenInset',
+    vibrancy: 'sidebar',
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.mjs'),
+      sandbox: false,
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  })
+
+  win.on('ready-to-show', () => {
+    win.show()
+  })
+
+  win.webContents.on('did-finish-load', () => {
+    const theme = nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
+    win.webContents.send('theme-changed', theme)
+  })
+
+  if (isDev && process.env['ELECTRON_RENDERER_URL']) {
+    win.loadURL(process.env['ELECTRON_RENDERER_URL'])
+  } else {
+    win.loadFile(join(__dirname, '../renderer/index.html'))
+  }
+
+  return win
+}
+
+app.whenReady().then(() => {
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.pgapp.client')
+  }
+
+  nativeTheme.on('updated', () => {
+    const theme = nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
+    BrowserWindow.getAllWindows().forEach((win) => {
+      win.webContents.send('theme-changed', theme)
+    })
+  })
+
+  applyStoredTheme()
+  buildAppMenu()
+
+  registerConnectionHandlers()
+  registerQueryHandlers()
+  registerSchemaHandlers()
+  registerExportHandlers()
+  registerHistoryHandlers()
+  registerSettingsHandlers()
+
+  createWindow()
+
+  if (!isDev) {
+    autoUpdater.checkForUpdatesAndNotify()
+  }
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow()
+    }
+  })
+})
+
+app.on('window-all-closed', async () => {
+  await disconnectAll()
+  if (process.platform !== 'darwin') {
+    app.quit()
+  }
+})
+
+autoUpdater.on('update-available', () => {
+  BrowserWindow.getAllWindows().forEach((win) => {
+    win.webContents.send('update-available')
+  })
+})
+
+autoUpdater.on('update-downloaded', () => {
+  BrowserWindow.getAllWindows().forEach((win) => {
+    win.webContents.send('update-downloaded')
+  })
+})
