@@ -114,7 +114,15 @@ const api = {
       updates: Record<string, unknown>
     }): Promise<{ success: boolean }> => ipcRenderer.invoke('query:updateRow', params),
     getPrimaryKeys: (connectionId: string, schema: string, table: string): Promise<string[]> =>
-      ipcRenderer.invoke('query:getPrimaryKeys', { connectionId, schema, table })
+      ipcRenderer.invoke('query:getPrimaryKeys', { connectionId, schema, table }),
+    searchTable: (params: {
+      connectionId: string
+      schema: string
+      table: string
+      term: string
+      orderBy?: { column: string; dir: 'ASC' | 'DESC' }
+    }): Promise<{ matchingRows: number[]; total: number }> =>
+      ipcRenderer.invoke('query:searchTable', params)
   },
   schema: {
     getSchemas: (connectionId: string): Promise<string[]> =>

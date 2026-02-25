@@ -57,6 +57,13 @@ declare global {
           updates: Record<string, unknown>
         }): Promise<{ success: boolean }>
         getPrimaryKeys(connectionId: string, schema: string, table: string): Promise<string[]>
+        searchTable(params: {
+          connectionId: string
+          schema: string
+          table: string
+          term: string
+          orderBy?: { column: string; dir: 'ASC' | 'DESC' }
+        }): Promise<{ matchingRows: number[]; total: number }>
       }
       schema: {
         getSchemas(connectionId: string): Promise<string[]>

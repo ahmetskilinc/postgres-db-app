@@ -142,6 +142,62 @@ export function registerQueryHandlers(): void {
   )
 
   ipcMain.handle(
+    'query:searchTable',
+    async (
+      _e,
+      {
+        connectionId,
+        schema,
+        table,
+        term,
+        orderBy
+      }: {
+        connectionId: string
+        schema: string
+        table: string
+        term: string
+        orderBy?: { column: string; dir: 'ASC' | 'DESC' }
+      }
+    ) => {
+      const pool = getPool(connectionId)
+      if (!pool) throw new Error('Not connected')
+
+      // Get column names + data types for this table
+      const colResult = await pool.query(
+        `SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 ORDER BY ordinal_position`,
+        [schema, table]
+      )
+      // Skip binary/bytea columns that can't meaningfully cast to text
+      const skipTypes = new Set(['bytea', 'ARRAY', 'USER-DEFINED'])
+      const cols = colResult.rows
+        .filter((r: Record<string, unknown>) => !skipTypes.has(r.data_type as string))
+        .map((r: Record<string, unknown>) => r.column_name as string)
+      if (cols.length === 0) return { matchingRows: [], total: 0 }
+
+      const pattern = `%${term.replace(/[%_\\]/g, '\\$&')}%`
+      const searchConditions = cols.map((c) => `COALESCE("${c}"::text, '') ILIKE $1`).join(' OR ')
+      const orderClause = orderBy ? `ORDER BY "${orderBy.column}" ${orderBy.dir}` : ''
+
+      // Number ALL rows using the same ordering the table browser uses,
+      // then filter to only those matching. _rn is the global 0-based row index.
+      const result = await pool.query(
+        `SELECT _rn FROM (
+          SELECT ROW_NUMBER() OVER (${orderClause}) - 1 AS _rn, *
+          FROM "${schema}"."${table}"
+        ) AS _numbered
+        WHERE ${searchConditions}
+        ORDER BY _rn`,
+        [pattern]
+      )
+
+      return {
+        matchingRows: result.rows.map((r: Record<string, unknown>) => Number(r._rn)),
+        total: result.rows.length
+      }
+    }
+  )
+
+  ipcMain.handle(
     'query:updateRow',
     async (
       _e,
