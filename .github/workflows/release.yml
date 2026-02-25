@@ -177,7 +177,7 @@ jobs:
 
       - name: Build macOS installer
         if: matrix.os == 'macos-latest'
-        run: bunx electron-builder --mac dmg --publish never
+        run: bunx electron-builder --mac dmg zip --publish never
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
@@ -216,8 +216,15 @@ jobs:
           if-no-files-found: warn
           path: |
             dist/*.dmg
+            dist/*.zip
             dist/*.exe
+            dist/*.nsis.7z
             dist/*.AppImage
+            dist/*.blockmap
+            dist/latest*.yml
+            dist/latest*.yaml
+            dist/*.yml
+            dist/*.yaml
 
   release:
     needs: [prepare, build]
