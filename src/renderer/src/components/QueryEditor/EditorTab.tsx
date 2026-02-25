@@ -15,12 +15,93 @@ export function EditorTab(): JSX.Element {
 
   const handleMount: OnMount = (editor, monaco) => {
     editorRef.current = editor
+
     editor.addAction({
       id: 'run-query',
       label: 'Run Query',
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
       run: () => handleRun()
     })
+
+    const disposable = monaco.languages.registerCompletionItemProvider('sql', {
+      triggerCharacters: [' ', '.', '"', "'"],
+      provideCompletionItems: (model, position) => {
+        const { schemaStates, activeConnectionId } = useAppStore.getState()
+        if (!activeConnectionId) return { suggestions: [] }
+        const state = schemaStates[activeConnectionId]
+        if (!state) return { suggestions: [] }
+
+        const word = model.getWordUntilPosition(position)
+        const range = {
+          startLineNumber: position.lineNumber,
+          endLineNumber: position.lineNumber,
+          startColumn: word.startColumn,
+          endColumn: word.endColumn
+        }
+
+        const suggestions: import('monaco-editor').languages.CompletionItem[] = []
+
+        for (const schema of state.schemas) {
+          suggestions.push({
+            label: schema,
+            kind: monaco.languages.CompletionItemKind.Module,
+            insertText: `"${schema}"`,
+            detail: 'schema',
+            sortText: '0_' + schema,
+            range
+          })
+        }
+
+        for (const [schemaName, tables] of Object.entries(state.tables)) {
+          for (const tbl of tables) {
+            suggestions.push({
+              label: tbl.name,
+              kind: monaco.languages.CompletionItemKind.Class,
+              insertText: `"${tbl.name}"`,
+              detail: `${schemaName} · ${tbl.type.toLowerCase()}`,
+              sortText: '1_' + tbl.name,
+              range
+            })
+            suggestions.push({
+              label: `${schemaName}.${tbl.name}`,
+              kind: monaco.languages.CompletionItemKind.Class,
+              insertText: `"${schemaName}"."${tbl.name}"`,
+              detail: tbl.type.toLowerCase(),
+              sortText: '1_' + schemaName + '_' + tbl.name,
+              range
+            })
+          }
+        }
+
+        for (const cols of Object.values(state.columns)) {
+          for (const col of cols) {
+            suggestions.push({
+              label: col.name,
+              kind: monaco.languages.CompletionItemKind.Field,
+              insertText: `"${col.name}"`,
+              detail: col.type + (col.isPrimary ? ' 🔑' : ''),
+              sortText: '2_' + col.name,
+              range
+            })
+          }
+        }
+
+        const keywords = ['SELECT', 'FROM', 'WHERE', 'JOIN', 'LEFT JOIN', 'INNER JOIN', 'GROUP BY', 'ORDER BY', 'HAVING', 'LIMIT', 'OFFSET', 'INSERT INTO', 'UPDATE', 'DELETE FROM', 'SET', 'VALUES', 'RETURNING', 'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'DISTINCT', 'AS', 'ON', 'AND', 'OR', 'NOT', 'IN', 'LIKE', 'ILIKE', 'IS NULL', 'IS NOT NULL', 'BETWEEN', 'EXISTS', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'COALESCE', 'NULLIF', 'CAST', 'NOW()', 'CURRENT_TIMESTAMP']
+        for (const kw of keywords) {
+          suggestions.push({
+            label: kw,
+            kind: monaco.languages.CompletionItemKind.Keyword,
+            insertText: kw,
+            sortText: '3_' + kw,
+            range
+          })
+        }
+
+        return { suggestions }
+      }
+    })
+
+    return () => disposable.dispose()
   }
 
   const handleRun = useCallback(async () => {

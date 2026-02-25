@@ -90,7 +90,21 @@ const api = {
       limit: number
       offset: number
       orderBy?: { column: string; dir: 'ASC' | 'DESC' }
+      where?: string
     }): Promise<TableData> => ipcRenderer.invoke('query:fetchTable', params),
+    insertRow: (params: {
+      connectionId: string
+      schema: string
+      table: string
+      values: Record<string, unknown>
+    }): Promise<Record<string, unknown>> => ipcRenderer.invoke('query:insertRow', params),
+    deleteRows: (params: {
+      connectionId: string
+      schema: string
+      table: string
+      primaryKeys: string[]
+      pkValuesList: Record<string, unknown>[]
+    }): Promise<{ deleted: number }> => ipcRenderer.invoke('query:deleteRows', params),
     updateRow: (params: {
       connectionId: string
       schema: string

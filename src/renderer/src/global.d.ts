@@ -33,7 +33,21 @@ declare global {
           limit: number
           offset: number
           orderBy?: { column: string; dir: 'ASC' | 'DESC' }
+          where?: string
         }): Promise<TableData>
+        insertRow(params: {
+          connectionId: string
+          schema: string
+          table: string
+          values: Record<string, unknown>
+        }): Promise<Record<string, unknown>>
+        deleteRows(params: {
+          connectionId: string
+          schema: string
+          table: string
+          primaryKeys: string[]
+          pkValuesList: Record<string, unknown>[]
+        }): Promise<{ deleted: number }>
         updateRow(params: {
           connectionId: string
           schema: string

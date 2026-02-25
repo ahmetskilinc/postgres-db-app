@@ -1,6 +1,6 @@
 import { useAppStore } from '../../store/useAppStore'
 import { Button } from '../ui/button'
-import { Plus, X, Code2, Table2, Settings, Unplug } from 'lucide-react'
+import { Plus, X, Code2, Table2, Settings, Unplug, Clock } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import type { EditorTab } from '../../store/useAppStore'
 
@@ -16,7 +16,9 @@ export function TitleBar(): JSX.Element {
     setActiveTab,
     disconnectFromDb,
     openConnectionDialog,
-    openSettings
+    openSettings,
+    toggleHistoryPanel,
+    historyPanelOpen
   } = useAppStore()
 
   const activeConn = connections.find((c) => c.id === activeConnectionId)
@@ -82,6 +84,15 @@ export function TitleBar(): JSX.Element {
 
       {/* Right actions — no-drag */}
       <div className="titlebar-no-drag ml-2 flex shrink-0 items-center gap-0.5 pr-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn('h-6 w-6', historyPanelOpen ? 'text-primary' : 'text-muted-foreground')}
+          onClick={toggleHistoryPanel}
+          title="Query History"
+        >
+          <Clock className="h-3.5 w-3.5" />
+        </Button>
         <Button
           variant="ghost"
           size="icon"

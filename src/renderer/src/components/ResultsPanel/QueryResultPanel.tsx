@@ -1,13 +1,17 @@
 import { useAppStore } from '../../store/useAppStore'
 import { ResultsGrid } from './ResultsGrid'
+import { RowInspector } from './RowInspector'
 import { AlertCircle, Clock, Loader2 } from 'lucide-react'
-import { formatDuration, formatRowCount } from '../../lib/utils'
+import { formatDuration } from '../../lib/utils'
 
 export function QueryResultPanel(): JSX.Element {
-  const { tabs, activeTabId } = useAppStore()
+  const { tabs, activeTabId, inspectedRow } = useAppStore()
   const activeTab = tabs.find((t) => t.id === activeTabId)
 
-  if (!activeTab || activeTab.mode === 'table') return <div className="flex-1" />
+  // In table browser mode, the bottom panel is always the row inspector
+  if (!activeTab || activeTab.mode === 'table') {
+    return <RowInspector />
+  }
 
   if (activeTab.isLoading) {
     return (
@@ -34,33 +38,36 @@ export function QueryResultPanel(): JSX.Element {
     )
   }
 
-  if (!activeTab.result) {
-    return (
-      <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-        Run a query to see results
-      </div>
-    )
-  }
+  // In query mode with results, show inspector if a row is selected, otherwise show grid
+  if (activeTab.result) {
+    const { result } = activeTab
 
-  const { result } = activeTab
-
-  if (result.rows.length === 0 && result.command !== 'SELECT') {
-    return (
-      <div className="flex h-full flex-col">
-        <div className="flex items-center gap-3 border-b border-border bg-green-500/10 px-3 py-2">
-          <span className="text-xs text-green-600 dark:text-green-400">
-            {result.command} — {result.rowCount} row{result.rowCount !== 1 ? 's' : ''} affected
-          </span>
-          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Clock className="h-3 w-3" />
-            {formatDuration(result.durationMs)}
-          </span>
+    if (result.rows.length === 0 && result.command !== 'SELECT') {
+      return (
+        <div className="flex h-full flex-col">
+          <div className="flex items-center gap-3 border-b border-border bg-green-500/10 px-3 py-2">
+            <span className="text-xs text-green-600 dark:text-green-400">
+              {result.command} — {result.rowCount} row{result.rowCount !== 1 ? 's' : ''} affected
+            </span>
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              {formatDuration(result.durationMs)}
+            </span>
+          </div>
         </div>
-      </div>
-    )
+      )
+    }
+
+    if (inspectedRow) {
+      return <RowInspector />
+    }
+
+    return <ResultsGrid rows={result.rows} fields={result.fields} />
   }
 
   return (
-    <ResultsGrid rows={result.rows} fields={result.fields} />
+    <div className="flex h-full items-center justify-center text-xs text-muted-foreground/40">
+      Run a query to see results
+    </div>
   )
 }

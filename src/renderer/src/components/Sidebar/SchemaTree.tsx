@@ -121,8 +121,10 @@ function TableRow({
   onOpen: () => void
 }): JSX.Element {
   const [expanded, setExpanded] = useState(false)
-  const [columns, setColumns] = useState<ColumnInfo[] | null>(null)
   const [loading, setLoading] = useState(false)
+  const { cacheColumns, schemaStates } = useAppStore()
+  const cacheKey = `${table.schema}.${table.name}`
+  const columns = schemaStates[connectionId]?.columns[cacheKey] ?? null
 
   const Icon = table.type === 'VIEW' || table.type === 'MATERIALIZED VIEW' ? Eye : Table2
 
@@ -131,7 +133,7 @@ function TableRow({
       setLoading(true)
       try {
         const cols = await window.api.schema.getColumns(connectionId, table.schema, table.name)
-        setColumns(cols)
+        cacheColumns(connectionId, table.schema, table.name, cols)
       } finally {
         setLoading(false)
       }

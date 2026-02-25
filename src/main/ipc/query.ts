@@ -4,6 +4,63 @@ import { getPrimaryKeys } from '../db/introspect'
 
 export function registerQueryHandlers(): void {
   ipcMain.handle(
+    'query:insertRow',
+    async (
+      _e,
+      {
+        connectionId,
+        schema,
+        table,
+        values
+      }: { connectionId: string; schema: string; table: string; values: Record<string, unknown> }
+    ) => {
+      const pool = getPool(connectionId)
+      if (!pool) throw new Error('Not connected')
+
+      const cols = Object.keys(values)
+      const placeholders = cols.map((_, i) => `$${i + 1}`)
+      const result = await pool.query(
+        `INSERT INTO "${schema}"."${table}" (${cols.map((c) => `"${c}"`).join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING *`,
+        Object.values(values)
+      )
+      return result.rows[0]
+    }
+  )
+
+  ipcMain.handle(
+    'query:deleteRows',
+    async (
+      _e,
+      {
+        connectionId,
+        schema,
+        table,
+        primaryKeys,
+        pkValuesList
+      }: {
+        connectionId: string
+        schema: string
+        table: string
+        primaryKeys: string[]
+        pkValuesList: Record<string, unknown>[]
+      }
+    ) => {
+      const pool = getPool(connectionId)
+      if (!pool) throw new Error('Not connected')
+
+      let deleted = 0
+      for (const pkValues of pkValuesList) {
+        const whereClauses = primaryKeys.map((pk, i) => `"${pk}" = $${i + 1}`)
+        await pool.query(
+          `DELETE FROM "${schema}"."${table}" WHERE ${whereClauses.join(' AND ')}`,
+          primaryKeys.map((pk) => pkValues[pk])
+        )
+        deleted++
+      }
+      return { deleted }
+    }
+  )
+  ipcMain.handle(
     'query:execute',
     async (_e, { connectionId, sql }: { connectionId: string; sql: string }) => {
       const pool = getPool(connectionId)
@@ -48,7 +105,8 @@ export function registerQueryHandlers(): void {
         table,
         limit,
         offset,
-        orderBy
+        orderBy,
+        where
       }: {
         connectionId: string
         schema: string
@@ -56,19 +114,21 @@ export function registerQueryHandlers(): void {
         limit: number
         offset: number
         orderBy?: { column: string; dir: 'ASC' | 'DESC' }
+        where?: string
       }
     ) => {
       const pool = getPool(connectionId)
       if (!pool) throw new Error('Not connected')
 
       const orderClause = orderBy ? `ORDER BY "${orderBy.column}" ${orderBy.dir}` : ''
+      const whereClause = where ? `WHERE ${where}` : ''
 
       const [dataResult, countResult] = await Promise.all([
-        pool.query(`SELECT * FROM "${schema}"."${table}" ${orderClause} LIMIT $1 OFFSET $2`, [
-          limit,
-          offset
-        ]),
-        pool.query(`SELECT COUNT(*) AS total FROM "${schema}"."${table}"`)
+        pool.query(
+          `SELECT * FROM "${schema}"."${table}" ${whereClause} ${orderClause} LIMIT $1 OFFSET $2`,
+          [limit, offset]
+        ),
+        pool.query(`SELECT COUNT(*) AS total FROM "${schema}"."${table}" ${whereClause}`)
       ])
 
       return {

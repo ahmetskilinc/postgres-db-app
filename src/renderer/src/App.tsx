@@ -4,6 +4,7 @@ import { useAppStore } from './store/useAppStore'
 import { ConnectionList } from './components/Sidebar/ConnectionList'
 import { SchemaTree } from './components/Sidebar/SchemaTree'
 import { TitleBar } from './components/TitleBar/TitleBar'
+import { QueryHistoryPanel } from './components/QueryHistory/QueryHistoryPanel'
 import { EditorTab } from './components/QueryEditor/EditorTab'
 import { QueryResultPanel } from './components/ResultsPanel/QueryResultPanel'
 import { StatusBar } from './components/StatusBar/StatusBar'
@@ -14,7 +15,8 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './componen
 import { TooltipProvider } from './components/ui/tooltip'
 
 export default function App(): JSX.Element {
-  const { theme, setTheme, setUpdateAvailable, openSettings, loadSettings } = useAppStore()
+  const { theme, setTheme, setUpdateAvailable, openSettings, loadSettings, historyPanelOpen } =
+    useAppStore()
 
   useEffect(() => {
     if (!window.api) return
@@ -42,14 +44,21 @@ export default function App(): JSX.Element {
         <TitleBar />
 
         <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
-          <ResizablePanel defaultSize={22} minSize={14} maxSize={38} className="flex flex-col sidebar-bg border-r border-sidebar-border">
+          {/* Left sidebar — connections + schema tree */}
+          <ResizablePanel
+            defaultSize={20}
+            minSize={14}
+            maxSize={35}
+            className="flex flex-col sidebar-bg border-r border-sidebar-border"
+          >
             <ConnectionList />
             <SchemaTree />
           </ResizablePanel>
 
           <ResizableHandle />
 
-          <ResizablePanel defaultSize={78} className="flex flex-col bg-background">
+          {/* Main content */}
+          <ResizablePanel defaultSize={historyPanelOpen ? 60 : 80} className="flex flex-col bg-background">
             <ResizablePanelGroup direction="vertical" className="flex-1 overflow-hidden">
               <ResizablePanel defaultSize={55} minSize={20}>
                 <EditorTab />
@@ -60,6 +69,21 @@ export default function App(): JSX.Element {
               </ResizablePanel>
             </ResizablePanelGroup>
           </ResizablePanel>
+
+          {/* Right sidebar — query history, collapsible */}
+          {historyPanelOpen && (
+            <>
+              <ResizableHandle />
+              <ResizablePanel
+                defaultSize={20}
+                minSize={14}
+                maxSize={35}
+                className="flex flex-col sidebar-bg border-l border-sidebar-border"
+              >
+                <QueryHistoryPanel />
+              </ResizablePanel>
+            </>
+          )}
         </ResizablePanelGroup>
 
         <StatusBar />
