@@ -204,15 +204,8 @@ jobs:
           if-no-files-found: warn
           path: |
             dist/*.dmg
-            dist/*.zip
             dist/*.exe
-            dist/*.nsis.7z
             dist/*.AppImage
-            dist/*.blockmap
-            dist/latest*.yml
-            dist/latest*.yaml
-            dist/*.yml
-            dist/*.yaml
 
   release:
     needs: [prepare, build]
