@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import type { SavedConnection } from '../../types'
+import { trackEvent } from '../../lib/analytics'
 
 export function ConnectionList(): JSX.Element {
   const {
@@ -48,6 +49,14 @@ export function ConnectionList(): JSX.Element {
     setConnecting(conn.id)
     try {
       await connectToDb(conn.id)
+      trackEvent('connection_connected', {
+        ssl: conn.ssl
+      })
+    } catch (error) {
+      trackEvent('connection_failed', {
+        message: error instanceof Error ? error.message : 'unknown'
+      })
+      throw error
     } finally {
       setConnecting(null)
     }

@@ -37,6 +37,7 @@ interface AppState {
   settingsOpen: boolean;
   editorFontSize: number;
   themePreference: "auto" | "dark" | "light";
+  analyticsEnabled: boolean;
 
   loadConnections: () => Promise<void>;
   setActiveConnection: (id: string | null) => void;
@@ -60,7 +61,7 @@ interface AppState {
   openSettings: () => void;
   closeSettings: () => void;
   loadSettings: () => Promise<void>;
-  saveSettings: (s: Partial<{ theme: "auto" | "dark" | "light"; editorFontSize: number }>) => Promise<void>;
+  saveSettings: (s: Partial<{ theme: "auto" | "dark" | "light"; editorFontSize: number; analyticsEnabled: boolean }>) => Promise<void>;
   historyPanelOpen: boolean;
   toggleHistoryPanel: () => void;
   cacheColumns: (connectionId: string, schema: string, table: string, columns: ColumnInfo[]) => void;
@@ -103,6 +104,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   settingsOpen: false,
   editorFontSize: 13,
   themePreference: "auto" as const,
+  analyticsEnabled: true,
   historyPanelOpen: false,
   inspectedRow: null,
 
@@ -290,13 +292,21 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadSettings: async () => {
     if (!window.api) return;
     const settings = await window.api.settings.get();
-    set({ themePreference: settings.theme, editorFontSize: settings.editorFontSize });
+    set({
+      themePreference: settings.theme,
+      editorFontSize: settings.editorFontSize,
+      analyticsEnabled: settings.analyticsEnabled
+    });
   },
 
   saveSettings: async (s) => {
     if (!window.api) return;
     const updated = await window.api.settings.set(s);
-    set({ themePreference: updated.theme, editorFontSize: updated.editorFontSize });
+    set({
+      themePreference: updated.theme,
+      editorFontSize: updated.editorFontSize,
+      analyticsEnabled: updated.analyticsEnabled
+    });
   },
 
   toggleHistoryPanel: () => set((s) => ({ historyPanelOpen: !s.historyPanelOpen })),

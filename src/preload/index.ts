@@ -161,11 +161,22 @@ const api = {
       ipcRenderer.invoke('history:clear', connectionId)
   },
   settings: {
-    get: (): Promise<{ theme: 'auto' | 'dark' | 'light'; editorFontSize: number }> =>
-      ipcRenderer.invoke('settings:get'),
-    set: (settings: Partial<{ theme: 'auto' | 'dark' | 'light'; editorFontSize: number }>): Promise<{
+    get: (): Promise<{
       theme: 'auto' | 'dark' | 'light'
       editorFontSize: number
+      analyticsEnabled: boolean
+    }> =>
+      ipcRenderer.invoke('settings:get'),
+    set: (
+      settings: Partial<{
+        theme: 'auto' | 'dark' | 'light'
+        editorFontSize: number
+        analyticsEnabled: boolean
+      }>
+    ): Promise<{
+      theme: 'auto' | 'dark' | 'light'
+      editorFontSize: number
+      analyticsEnabled: boolean
     }> => ipcRenderer.invoke('settings:set', settings),
     onOpenRequest: (callback: () => void): (() => void) => {
       ipcRenderer.on('open-settings', callback)

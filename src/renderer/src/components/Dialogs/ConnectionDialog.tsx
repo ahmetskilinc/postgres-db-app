@@ -13,6 +13,7 @@ import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { CheckCircle2, Loader2, XCircle, ClipboardPaste } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { toBucket, trackEvent } from '../../lib/analytics'
 
 const CONNECTION_COLORS = [
   '#6366f1',
@@ -190,8 +191,18 @@ export function ConnectionDialog(): JSX.Element {
         ssl: effective.ssl
       })
       setTestResult(result)
+      trackEvent('connection_tested', {
+        success: result.success,
+        latencyBucket:
+          typeof result.latencyMs === 'number' ? toBucket(result.latencyMs, [50, 100, 250, 500, 1000]) : 'unknown',
+        ssl: effective.ssl
+      })
     } catch {
       setTestResult({ success: false, error: 'Unexpected error' })
+      trackEvent('connection_tested', {
+        success: false,
+        latencyBucket: 'unknown'
+      })
     } finally {
       setTesting(false)
     }

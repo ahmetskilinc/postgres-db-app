@@ -1,9 +1,11 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "table",
       "dependencies": {
+        "@databuddy/sdk": "^2.3.29",
         "@electron-toolkit/preload": "^3.0.0",
         "@electron-toolkit/utils": "^3.0.0",
         "@monaco-editor/react": "^4.6.0",
@@ -96,6 +98,8 @@
     "@babel/traverse": ["@babel/traverse@7.29.0", "", { "dependencies": { "@babel/code-frame": "^7.29.0", "@babel/generator": "^7.29.0", "@babel/helper-globals": "^7.28.0", "@babel/parser": "^7.29.0", "@babel/template": "^7.28.6", "@babel/types": "^7.29.0", "debug": "^4.3.1" } }, "sha512-4HPiQr0X7+waHfyXPZpWPfWL/J7dcN1mx9gL6WdQVMbPnF3+ZhSMs8tCxN7oHddJE9fhNE7+lxdnlyemKfJRuA=="],
 
     "@babel/types": ["@babel/types@7.29.0", "", { "dependencies": { "@babel/helper-string-parser": "^7.27.1", "@babel/helper-validator-identifier": "^7.28.5" } }, "sha512-LwdZHpScM4Qz8Xw2iKSzS+cfglZzJGvofQICy7W7v4caru4EaAmyUuO6BGrbyQ2mYV11W0U8j5mBhd14dd3B0A=="],
+
+    "@databuddy/sdk": ["@databuddy/sdk@2.3.29", "", { "peerDependencies": { "@ai-sdk/provider": "^2.0.0", "ai": "^5.0.51", "msw": "^2.11.5", "react": ">=18", "tokenlens": "^2.0.0-alpha.3", "vue": ">=3" }, "optionalPeers": ["@ai-sdk/provider", "ai", "msw", "react", "tokenlens", "vue"] }, "sha512-GuqlPsrgxYpmICstsVEpr6FFWHCkcTW5sgdKgPmCXfJyzdOUXRn17HkGEiuZKYzbADSxx1x9dXMCL/40JP3p2g=="],
 
     "@develar/schema-utils": ["@develar/schema-utils@2.6.5", "", { "dependencies": { "ajv": "^6.12.0", "ajv-keywords": "^3.4.1" } }, "sha512-0cp4PsWQ/9avqTVMCtZ+GirikIA36ikvjtHweU4/j8yLtgObI0+JUPhYFScgwlteveGB1rt3Cm8UhN04XayDig=="],
 

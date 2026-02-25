@@ -75,7 +75,10 @@ export function registerQueryHandlers(): void {
           const last = result[result.length - 1]
           return {
             rows: last.rows,
-            fields: last.fields.map((f) => ({ name: f.name, dataTypeID: f.dataTypeID })),
+            fields: last.fields.map((f: { name: string; dataTypeID: number }) => ({
+              name: f.name,
+              dataTypeID: f.dataTypeID
+            })),
             rowCount: last.rowCount ?? last.rows.length,
             durationMs,
             command: last.command
@@ -84,7 +87,10 @@ export function registerQueryHandlers(): void {
 
         return {
           rows: result.rows,
-          fields: result.fields.map((f) => ({ name: f.name, dataTypeID: f.dataTypeID })),
+          fields: result.fields.map((f: { name: string; dataTypeID: number }) => ({
+            name: f.name,
+            dataTypeID: f.dataTypeID
+          })),
           rowCount: result.rowCount ?? result.rows.length,
           durationMs,
           command: result.command
@@ -133,7 +139,10 @@ export function registerQueryHandlers(): void {
 
       return {
         rows: dataResult.rows,
-        fields: dataResult.fields.map((f) => ({ name: f.name, dataTypeID: f.dataTypeID })),
+        fields: dataResult.fields.map((f: { name: string; dataTypeID: number }) => ({
+          name: f.name,
+          dataTypeID: f.dataTypeID
+        })),
         total: parseInt(countResult.rows[0].total as string),
         limit,
         offset

@@ -14,6 +14,7 @@ import { CommandPalette } from './components/CommandPalette/CommandPalette'
 import { Toaster } from './components/ui/toaster'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './components/ui/resizable'
 import { TooltipProvider } from './components/ui/tooltip'
+import { initAnalytics, setAnalyticsEnabled, trackEvent } from './lib/analytics'
 
 export default function App(): JSX.Element {
   const { theme, setTheme, setUpdateAvailable, openSettings, loadSettings, historyPanelOpen } =
@@ -22,19 +23,37 @@ export default function App(): JSX.Element {
   useEffect(() => {
     if (!window.api) return
 
-    loadSettings()
+    ;(async () => {
+      await loadSettings()
+      const settings = await window.api.settings.get()
+      initAnalytics(settings.analyticsEnabled)
+      setAnalyticsEnabled(settings.analyticsEnabled)
+      trackEvent('app_opened', {
+        theme: settings.theme,
+        os: navigator.platform,
+        appVersion: (import.meta as ImportMeta & { env: Record<string, string | undefined> }).env
+          .VITE_APP_VERSION ?? 'unknown'
+      })
+    })()
 
     const unlisten = window.api.theme.onChange((t) => {
       setTheme(t)
       document.documentElement.classList.toggle('dark', t === 'dark')
     })
 
-    const unlistenUpdate = window.api.updater.onUpdateAvailable(() => setUpdateAvailable(true))
+    const unlistenUpdate = window.api.updater.onUpdateAvailable(() => {
+      setUpdateAvailable(true)
+      trackEvent('update_available')
+    })
+    const unlistenDownloaded = window.api.updater.onUpdateDownloaded(() => {
+      trackEvent('update_downloaded')
+    })
     const unlistenSettings = window.api.settings.onOpenRequest(() => openSettings())
 
     return () => {
       unlisten()
       unlistenUpdate()
+      unlistenDownloaded()
       unlistenSettings()
     }
   }, [])

@@ -87,10 +87,21 @@ declare global {
         clear(connectionId?: string): Promise<void>
       }
       settings: {
-        get(): Promise<{ theme: 'auto' | 'dark' | 'light'; editorFontSize: number }>
-        set(settings: Partial<{ theme: 'auto' | 'dark' | 'light'; editorFontSize: number }>): Promise<{
+        get(): Promise<{
           theme: 'auto' | 'dark' | 'light'
           editorFontSize: number
+          analyticsEnabled: boolean
+        }>
+        set(
+          settings: Partial<{
+            theme: 'auto' | 'dark' | 'light'
+            editorFontSize: number
+            analyticsEnabled: boolean
+          }>
+        ): Promise<{
+          theme: 'auto' | 'dark' | 'light'
+          editorFontSize: number
+          analyticsEnabled: boolean
         }>
         onOpenRequest(callback: () => void): () => void
       }

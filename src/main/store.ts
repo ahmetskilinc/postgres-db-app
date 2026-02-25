@@ -27,6 +27,7 @@ export interface QueryHistoryEntry {
 export interface AppSettings {
   theme: 'auto' | 'dark' | 'light'
   editorFontSize: number
+  analyticsEnabled: boolean
 }
 
 interface StoreSchema {
@@ -42,7 +43,8 @@ export const store = new Store<StoreSchema>({
     queryHistory: [],
     settings: {
       theme: 'auto',
-      editorFontSize: 13
+      editorFontSize: 13,
+      analyticsEnabled: true
     }
   }
 })
