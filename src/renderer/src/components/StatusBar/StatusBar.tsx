@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { formatDuration, formatRowCount } from '../../lib/utils'
 import { Clock, Rows3, Wifi, WifiOff, RefreshCw } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu'
 
 export function StatusBar(): JSX.Element {
   const {
@@ -13,14 +14,48 @@ export function StatusBar(): JSX.Element {
     activeTabId,
     latency,
     setLatency,
-    updateAvailable
+    updaterStatus,
+    updaterProgress,
+    updaterError,
+    setUpdaterState
   } = useAppStore()
 
   const latencyInterval = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [updateMenuOpen, setUpdateMenuOpen] = useState(false)
   const activeTab = tabs.find((t) => t.id === activeTabId)
   const isConnected = activeConnectionId ? connectedIds.includes(activeConnectionId) : false
   const activeConn = connections.find((c) => c.id === activeConnectionId)
   const currentLatency = activeConnectionId ? latency[activeConnectionId] : null
+  const hasUpdateIndicator =
+    updaterStatus === 'available' ||
+    updaterStatus === 'downloading' ||
+    updaterStatus === 'downloaded' ||
+    updaterStatus === 'error'
+
+  const updateLabel =
+    updaterStatus === 'downloading'
+      ? `Downloading ${Math.round(updaterProgress ?? 0)}%`
+      : updaterStatus === 'downloaded'
+      ? 'Restart to update'
+      : updaterStatus === 'error'
+      ? 'Update failed'
+      : 'Update available'
+
+  const handleDownloadUpdate = async (): Promise<void> => {
+    setUpdaterState({ status: 'downloading', progress: 0, error: null })
+    try {
+      await window.api.updater.download()
+      setUpdateMenuOpen(false)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to download update'
+      setUpdaterState({ status: 'error', error: message })
+    }
+  }
+
+  const handleInstallUpdate = async (): Promise<void> => {
+    await window.api.updater.quitAndInstall()
+    setUpdateMenuOpen(false)
+  }
 
   useEffect(() => {
     if (latencyInterval.current) clearInterval(latencyInterval.current)
@@ -83,11 +118,45 @@ export function StatusBar(): JSX.Element {
       </div>
 
       <div className="flex items-center gap-4">
-        {updateAvailable && (
-          <div className="flex items-center gap-1 text-primary">
-            <RefreshCw className="h-2.5 w-2.5" />
-            <span>Update available</span>
-          </div>
+        {hasUpdateIndicator && (
+          <DropdownMenu open={updateMenuOpen} onOpenChange={setUpdateMenuOpen}>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center gap-1 text-primary transition-opacity hover:opacity-90"
+              >
+                <RefreshCw className={cn('h-2.5 w-2.5', updaterStatus === 'downloading' && 'animate-spin')} />
+                <span>{updateLabel}</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {updaterStatus === 'available' && (
+                <DropdownMenuItem onSelect={() => void handleDownloadUpdate()}>
+                  Download update
+                </DropdownMenuItem>
+              )}
+              {updaterStatus === 'downloading' && (
+                <DropdownMenuItem disabled>Downloading {Math.round(updaterProgress ?? 0)}%</DropdownMenuItem>
+              )}
+              {updaterStatus === 'downloaded' && (
+                <DropdownMenuItem onSelect={() => void handleInstallUpdate()}>
+                  Restart to update
+                </DropdownMenuItem>
+              )}
+              {updaterStatus === 'error' && (
+                <>
+                  <DropdownMenuLabel className="max-w-56 truncate">
+                    {updaterError ?? 'Update failed'}
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem onSelect={() => void handleDownloadUpdate()}>
+                    Retry download
+                  </DropdownMenuItem>
+                </>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setUpdateMenuOpen(false)}>Later</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
 
         {activeTab?.result && (

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, nativeTheme } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron'
 
 app.setName('Table')
 import { join } from 'path'
@@ -76,8 +76,17 @@ app.whenReady().then(() => {
   createWindow()
 
   if (!isDev) {
+    autoUpdater.autoDownload = false
+    autoUpdater.autoInstallOnAppQuit = false
     autoUpdater.checkForUpdatesAndNotify()
   }
+
+  ipcMain.handle('updater:download', async () => {
+    await autoUpdater.downloadUpdate()
+  })
+  ipcMain.handle('updater:quitAndInstall', () => {
+    autoUpdater.quitAndInstall()
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -102,5 +111,26 @@ autoUpdater.on('update-available', () => {
 autoUpdater.on('update-downloaded', () => {
   BrowserWindow.getAllWindows().forEach((win) => {
     win.webContents.send('update-downloaded')
+  })
+})
+
+autoUpdater.on('update-not-available', () => {
+  BrowserWindow.getAllWindows().forEach((win) => {
+    win.webContents.send('update-not-available')
+  })
+})
+
+autoUpdater.on('error', (error) => {
+  BrowserWindow.getAllWindows().forEach((win) => {
+    win.webContents.send(
+      'update-error',
+      typeof error === 'string' ? error : (error?.message ?? 'Unknown updater error')
+    )
+  })
+})
+
+autoUpdater.on('download-progress', (progress) => {
+  BrowserWindow.getAllWindows().forEach((win) => {
+    win.webContents.send('download-progress', progress)
   })
 })

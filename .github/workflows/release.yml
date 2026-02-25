@@ -7,6 +7,13 @@ on:
         description: "Release tag (example: v0.2.0)"
         required: true
         type: string
+      release_type:
+        description: "Release type (optional)"
+        required: false
+        type: select
+        options:
+          - "release"
+          - "pre-release"
       release_name:
         description: "Release title (optional)"
         required: false
@@ -25,6 +32,7 @@ jobs:
     outputs:
       tag: ${{ steps.vars.outputs.tag }}
       version: ${{ steps.vars.outputs.version }}
+      release_type: ${{ steps.vars.outputs.release_type }}
       release_name: ${{ steps.vars.outputs.release_name }}
       release_notes: ${{ steps.vars.outputs.release_notes }}
     steps:
@@ -44,6 +52,7 @@ jobs:
             TAG="${{ inputs.tag }}"
             NAME="${{ inputs.release_name }}"
             NOTES="${{ inputs.release_notes }}"
+            RELEASE_TYPE="${{ inputs.release_type | default: 'release' }}"
             if [[ -z "$NAME" ]]; then
               NAME="Table ${TAG}"
             fi
@@ -51,10 +60,12 @@ jobs:
             TAG="${GITHUB_REF_NAME}"
             NAME="Table ${TAG}"
             NOTES=""
+            RELEASE_TYPE="${{ github.event_name == 'workflow_dispatch' ? 'release' : 'pre-release' }}"
           fi
           VERSION="${TAG#v}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "release_type=$RELEASE_TYPE" >> "$GITHUB_OUTPUT"
           echo "release_name=$NAME" >> "$GITHUB_OUTPUT"
           {
             echo "release_notes<<EOF"
