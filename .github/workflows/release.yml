@@ -194,6 +194,7 @@ jobs:
           codesign -dv --verbose=4 "$APP_PATH"
           codesign --verify --deep --verbose=2 "$APP_PATH"
           spctl -a -vv --type exec "$APP_PATH"
+          xcrun stapler staple "$DMG_PATH"
           xcrun stapler validate "$DMG_PATH"
 
       - name: Build Windows installer
