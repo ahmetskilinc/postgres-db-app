@@ -123,3 +123,27 @@
 .titlebar-no-drag {
   -webkit-app-region: no-drag;
 }
+
+/* cmdk overrides — group headings and hidden groups */
+[cmdk-group-heading] {
+  padding: 4px 8px;
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  user-select: none;
+}
+
+[cmdk-group][hidden] {
+  display: none;
+}
+
+[cmdk-list] {
+  scroll-padding-block: 8px;
+}
+
+[cmdk-separator] {
+  height: 1px;
+  background: hsl(var(--border));
+  margin: 4px 0;
+}
