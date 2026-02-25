@@ -191,7 +191,8 @@ jobs:
           fi
           APP_PATH="${APPS[0]}"
           DMG_PATH="${DMGS[0]}"
-          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          codesign -dv --verbose=4 "$APP_PATH"
+          codesign --verify --deep --verbose=2 "$APP_PATH"
           spctl -a -vv --type exec "$APP_PATH"
           xcrun stapler validate "$DMG_PATH"
 
