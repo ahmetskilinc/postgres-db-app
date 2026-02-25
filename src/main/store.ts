@@ -36,7 +36,7 @@ interface StoreSchema {
 }
 
 export const store = new Store<StoreSchema>({
-  name: 'pg-app-data',
+  name: 'table-data',
   defaults: {
     connections: [],
     queryHistory: [],

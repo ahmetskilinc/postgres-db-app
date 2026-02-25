@@ -1,0 +1,181 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (example: v0.2.0)"
+        required: true
+        type: string
+      release_name:
+        description: "Release title (optional)"
+        required: false
+        type: string
+      release_notes:
+        description: "Extra notes appended to generated notes (optional)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.vars.outputs.tag }}
+      version: ${{ steps.vars.outputs.version }}
+      release_name: ${{ steps.vars.outputs.release_name }}
+      release_notes: ${{ steps.vars.outputs.release_notes }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release values
+        id: vars
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TAG="${{ inputs.tag }}"
+            NAME="${{ inputs.release_name }}"
+            NOTES="${{ inputs.release_notes }}"
+            if [[ -z "$NAME" ]]; then
+              NAME="Table ${TAG}"
+            fi
+          else
+            TAG="${GITHUB_REF_NAME}"
+            NAME="Table ${TAG}"
+            NOTES=""
+          fi
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "release_name=$NAME" >> "$GITHUB_OUTPUT"
+          {
+            echo "release_notes<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Patch package version for manual run
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          VERSION="${{ steps.vars.outputs.version }}"
+          npm version "$VERSION" --no-git-tag-version
+          if git diff --quiet -- package.json; then
+            echo "No version file changes detected."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          if [[ -f package-lock.json ]]; then
+            git add package-lock.json
+          fi
+          git commit -m "chore(release): bump version to $VERSION"
+          git push origin HEAD
+
+      - name: Verify tag matches package version on tag push
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          VERSION_FROM_TAG="${{ steps.vars.outputs.version }}"
+          VERSION_FROM_PACKAGE="$(node -p "require('./package.json').version")"
+          if [[ "$VERSION_FROM_TAG" != "$VERSION_FROM_PACKAGE" ]]; then
+            echo "Tag version ($VERSION_FROM_TAG) does not match package.json version ($VERSION_FROM_PACKAGE)."
+            exit 1
+          fi
+
+      - name: Create tag for manual run
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          TAG="${{ steps.vars.outputs.tag }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag exists locally: $TAG"
+            exit 0
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag exists on origin: $TAG"
+            exit 0
+          fi
+          git tag "$TAG"
+          git push origin "$TAG"
+
+  build:
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ needs.prepare.outputs.tag }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app bundles
+        run: npm run build
+
+      - name: Build macOS installer
+        if: matrix.os == 'macos-latest'
+        run: npx electron-builder --mac dmg --publish never -c.mac.identity=null
+
+      - name: Build Windows installer
+        if: matrix.os == 'windows-latest'
+        run: npx electron-builder --win nsis --publish never
+
+      - name: Build Linux installer
+        if: matrix.os == 'ubuntu-latest'
+        run: npx electron-builder --linux AppImage --publish never
+
+      - name: Upload packaged artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.os }}
+          if-no-files-found: warn
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.exe
+            dist/*.nsis.7z
+            dist/*.AppImage
+            dist/*.blockmap
+            dist/latest*.yml
+            dist/latest*.yaml
+            dist/*.yml
+            dist/*.yaml
+
+  release:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: ${{ needs.prepare.outputs.release_name }}
+          generate_release_notes: true
+          append_body: true
+          body: ${{ needs.prepare.outputs.release_notes }}
+          files: release-assets/**

@@ -17,15 +17,15 @@ if (process.platform === 'darwin' && existsSync(appPath)) {
     plist = plist
       .replace(
         /<key>CFBundleDisplayName<\/key>\s*<string>Electron<\/string>/,
-        '<key>CFBundleDisplayName</key>\n\t<string>PG App</string>'
+        '<key>CFBundleDisplayName</key>\n\t<string>Table</string>'
       )
       .replace(
         /<key>CFBundleName<\/key>\s*<string>Electron<\/string>/,
-        '<key>CFBundleName</key>\n\t<string>PG App</string>'
+        '<key>CFBundleName</key>\n\t<string>Table</string>'
       )
     if (plist !== orig) {
       writeFileSync(plistPath, plist, 'utf-8')
-      console.log('✓ Electron bundle name patched to PG App')
+      console.log('✓ Electron bundle name patched to Table')
     }
   }
 

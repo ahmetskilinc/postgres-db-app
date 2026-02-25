@@ -43,7 +43,7 @@ export function SettingsDialog(): JSX.Element {
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Preferences</DialogTitle>
-          <DialogDescription>Customize PG App to your liking.</DialogDescription>
+          <DialogDescription>Customize Table to your liking.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-1">

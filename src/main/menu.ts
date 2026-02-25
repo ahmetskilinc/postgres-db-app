@@ -7,7 +7,7 @@ export function buildAppMenu(): void {
     ...(isMac
       ? ([
           {
-            label: 'PG App',
+            label: 'Table',
             submenu: [
               { role: 'about' },
               { type: 'separator' },

@@ -1,6 +1,6 @@
 import { app, BrowserWindow, nativeTheme } from 'electron'
 
-app.setName('PG App')
+app.setName('Table')
 import { join } from 'path'
 import updaterPkg from 'electron-updater'
 const { autoUpdater } = updaterPkg
@@ -53,7 +53,7 @@ function createWindow(): BrowserWindow {
 
 app.whenReady().then(() => {
   if (process.platform === 'win32') {
-    app.setAppUserModelId('com.pgapp.client')
+    app.setAppUserModelId('com.bruvimtired.table')
   }
 
   nativeTheme.on('updated', () => {

@@ -1,5 +1,5 @@
 {
-  "name": "postgres-db-app",
+  "name": "table",
   "version": "0.1.0",
   "author": "Ahmet Kilinc",
   "license": "MIT",
@@ -11,7 +11,7 @@
   "bugs": {
     "url": "https://github.com/ahmetskilinc/postgres-db-app/issues"
   },
-  "description": "PostgreSQL GUI client for local and cloud databases",
+  "description": "Table - PostgreSQL GUI client for local and cloud databases",
   "main": "out/main/index.js",
   "type": "module",
   "scripts": {
@@ -70,8 +70,8 @@
     "vite": "^5.4.11"
   },
   "build": {
-    "appId": "com.bruvimtired.postgres-db-app",
-    "productName": "PG App",
+    "appId": "com.bruvimtired.table",
+    "productName": "Table",
     "directories": {
       "buildResources": "build",
       "output": "dist"
