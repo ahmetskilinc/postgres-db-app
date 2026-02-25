@@ -1,6 +1,16 @@
 {
   "name": "pg-app",
   "version": "0.1.0",
+  "author": "Ahmet Kilinc",
+  "license": "MIT",
+  "homepage": "https://github.com/ahmetskilinc/pg-app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ahmetskilinc/pg-app.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ahmetskilinc/pg-app/issues"
+  },
   "description": "PostgreSQL GUI client for local and cloud databases",
   "main": "out/main/index.js",
   "type": "module",
@@ -59,7 +69,7 @@
     "vite": "^5.4.11"
   },
   "build": {
-    "appId": "com.pgapp.client",
+    "appId": "com.bruvimtired.pg-app",
     "productName": "PG App",
     "directories": {
       "buildResources": "build",
@@ -69,6 +79,10 @@
       "out/**/*"
     ],
     "mac": {
+      "notarize": {
+        "teamId": "DS2JFEEZDM"
+      },
+      "identity": "Ahmet Kilinc (DS2JFEEZDM)",
       "target": [
         {
           "target": "dmg",
@@ -98,7 +112,7 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "your-github-username",
+      "owner": "ahmetskilinc",
       "repo": "pg-app"
     }
   }
