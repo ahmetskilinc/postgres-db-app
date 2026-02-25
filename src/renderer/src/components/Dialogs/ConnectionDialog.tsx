@@ -54,8 +54,8 @@ function parseConnectionString(raw: string): Partial<FormState> | null {
     const trimmed = raw.trim()
     if (!trimmed) return null
 
-    const url = new URL(trimmed.replace(/^postgres:\/\//, 'postgresql://'))
-    if (!['postgresql:', 'postgres:'].includes(url.protocol.replace('ql', ''))) return null
+    if (!/^postgres(ql)?:\/\//i.test(trimmed)) return null
+    const url = new URL(trimmed.replace(/^postgres(ql)?:\/\//i, 'http://'))
 
     const host = url.hostname || 'localhost'
     const port = url.port || '5432'
@@ -128,6 +128,19 @@ export function ConnectionDialog(): JSX.Element {
   const field =
     (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value
+      if (typeof value === 'string') {
+        const parsed = parseConnectionString(value)
+        if (parsed) {
+          setForm((f) => {
+            const next = { ...f, ...parsed }
+            setConnStr(buildConnectionString(next))
+            return next
+          })
+          setTab('string')
+          setConnStr(value)
+          return
+        }
+      }
       setForm((f) => {
         const next = { ...f, [key]: value }
         setConnStr(buildConnectionString(next))
@@ -155,17 +168,26 @@ export function ConnectionDialog(): JSX.Element {
     }
   }
 
+  const getEffectiveForm = (): FormState => {
+    if (tab === 'string' && connStr.trim()) {
+      const parsed = parseConnectionString(connStr)
+      if (parsed) return { ...form, ...parsed }
+    }
+    return form
+  }
+
   const handleTest = async (): Promise<void> => {
     setTesting(true)
     setTestResult(null)
     try {
+      const effective = getEffectiveForm()
       const result = await window.api.connections.test({
-        host: form.host,
-        port: parseInt(form.port) || 5432,
-        database: form.database,
-        username: form.username,
-        password: form.password,
-        ssl: form.ssl
+        host: effective.host,
+        port: parseInt(effective.port) || 5432,
+        database: effective.database,
+        username: effective.username,
+        password: effective.password,
+        ssl: effective.ssl
       })
       setTestResult(result)
     } catch {
@@ -178,16 +200,17 @@ export function ConnectionDialog(): JSX.Element {
   const handleSave = async (): Promise<void> => {
     setSaving(true)
     try {
+      const effective = getEffectiveForm()
       await window.api.connections.save({
         id: editingConnectionId ?? undefined,
-        name: form.name || `${form.username}@${form.host}`,
-        host: form.host,
-        port: parseInt(form.port) || 5432,
-        database: form.database,
-        username: form.username,
-        password: form.password,
-        ssl: form.ssl,
-        color: form.color
+        name: effective.name || `${effective.username}@${effective.host}`,
+        host: effective.host,
+        port: parseInt(effective.port) || 5432,
+        database: effective.database,
+        username: effective.username,
+        password: effective.password,
+        ssl: effective.ssl,
+        color: effective.color
       })
       closeConnectionDialog()
     } finally {
