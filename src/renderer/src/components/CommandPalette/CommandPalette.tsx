@@ -47,6 +47,15 @@ export function CommandPalette(): JSX.Element {
   useEffect(() => {
     const down = (e: KeyboardEvent): void => {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        // Don't hijack Cmd+K inside editable fields (Monaco editor, inputs, etc.)
+        const el = e.target as HTMLElement
+        if (
+          el.tagName === 'INPUT' ||
+          el.tagName === 'TEXTAREA' ||
+          el.isContentEditable
+        ) {
+          return
+        }
         e.preventDefault()
         toggleCommandPalette()
       }
@@ -134,7 +143,7 @@ export function CommandPalette(): JSX.Element {
       onOpenChange={(open) => { if (!open) closeCommandPalette() }}
       label="Command Palette"
       loop
-      className={cn(
+      contentClassName={cn(
         'fixed left-1/2 top-[20%] z-50 w-full max-w-lg -translate-x-1/2',
         'rounded-lg border border-border bg-popover text-popover-foreground shadow-lg',
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
