@@ -142,9 +142,58 @@ jobs:
       - name: Build app bundles
         run: bun run build
 
+      - name: Check mac signing secrets
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          MISSING=0
+          for KEY in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            if [[ -z "${!KEY}" ]]; then
+              echo "Missing required secret: $KEY"
+              MISSING=1
+            fi
+          done
+          if [[ "$MISSING" -ne 0 ]]; then
+            exit 1
+          fi
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
       - name: Build macOS installer
         if: matrix.os == 'macos-latest'
-        run: bunx electron-builder --mac dmg --publish never -c.mac.identity=null
+        run: bunx electron-builder --mac dmg --publish never
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "true"
+
+      - name: Verify mac app signature and notarization
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          shopt -s nullglob
+          APPS=(dist/mac*/Table.app)
+          DMGS=(dist/*.dmg)
+          if [[ ${#APPS[@]} -eq 0 ]]; then
+            echo "No built .app found in dist/mac*/Table.app"
+            exit 1
+          fi
+          if [[ ${#DMGS[@]} -eq 0 ]]; then
+            echo "No dmg found in dist/*.dmg"
+            exit 1
+          fi
+          APP_PATH="${APPS[0]}"
+          DMG_PATH="${DMGS[0]}"
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          spctl -a -vv --type exec "$APP_PATH"
+          xcrun stapler validate "$DMG_PATH"
 
       - name: Build Windows installer
         if: matrix.os == 'windows-latest'
