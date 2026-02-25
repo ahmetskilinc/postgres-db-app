@@ -23,6 +23,7 @@
     "postinstall": "node scripts/codesign.mjs"
   },
   "dependencies": {
+    "@databuddy/sdk": "^2.3.29",
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
     "@monaco-editor/react": "^4.6.0",

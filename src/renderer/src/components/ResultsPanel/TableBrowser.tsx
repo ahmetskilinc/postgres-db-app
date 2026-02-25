@@ -12,6 +12,7 @@ import {
 import { toast } from '../../hooks/use-toast'
 import { cn } from '../../lib/utils'
 import type { TableData } from '../../types'
+import { trackEvent } from '../../lib/analytics'
 
 type FilterMode = 'query' | 'search'
 
@@ -86,6 +87,12 @@ export function TableBrowser({ tab }: { tab: EditorTab }): JSX.Element {
   useEffect(() => {
     if (!tab.tableData) fetchPage(0, null, '')
   }, [tab.id])
+
+  useEffect(() => {
+    trackEvent('table_opened', {
+      schema: meta.schema
+    })
+  }, [tab.id, meta.schema])
 
   const handleSort = (col: string): void => {
     const next: SortState =
@@ -280,6 +287,9 @@ export function TableBrowser({ tab }: { tab: EditorTab }): JSX.Element {
         primaryKeys: pks,
         pkValuesList
       })
+      trackEvent('rows_deleted', {
+        count: result.deleted
+      })
       toast({ title: `Deleted ${result.deleted} row${result.deleted !== 1 ? 's' : ''}` })
       fetchPage(page)
     } catch (err) {
@@ -296,6 +306,9 @@ export function TableBrowser({ tab }: { tab: EditorTab }): JSX.Element {
         schema: meta.schema,
         table: meta.table,
         values
+      })
+      trackEvent('row_inserted', {
+        fieldCount: Object.keys(values).length
       })
       toast({ title: 'Row inserted' })
       setPendingNewRow(false)

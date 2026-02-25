@@ -7,6 +7,7 @@ import {
 import { Button } from '../ui/button'
 import { Download, FileText, Braces } from 'lucide-react'
 import { toast } from '../../hooks/use-toast'
+import { trackEvent } from '../../lib/analytics'
 
 interface Props {
   rows: Record<string, unknown>[]
@@ -20,6 +21,7 @@ export function ExportMenu({ rows, fields }: Props): JSX.Element {
       fields.map((f) => ({ name: f.name }))
     )
     if (result?.success) {
+      trackEvent('results_exported', { format: 'csv', rowCount: rows.length })
       toast({ title: 'Exported', description: `Saved to ${result.path}` })
     }
   }
@@ -27,6 +29,7 @@ export function ExportMenu({ rows, fields }: Props): JSX.Element {
   const handleExportJSON = async (): Promise<void> => {
     const result = await window.api.export.json(rows)
     if (result?.success) {
+      trackEvent('results_exported', { format: 'json', rowCount: rows.length })
       toast({ title: 'Exported', description: `Saved to ${result.path}` })
     }
   }

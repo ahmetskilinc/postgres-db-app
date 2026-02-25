@@ -9,6 +9,7 @@ import {
 import { Separator } from '../ui/separator'
 import { Monitor, Moon, Sun } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { setAnalyticsEnabled } from '../../lib/analytics'
 
 type ThemeOption = {
   value: 'auto' | 'dark' | 'light'
@@ -26,7 +27,14 @@ const THEME_OPTIONS: ThemeOption[] = [
 const FONT_SIZES = [11, 12, 13, 14, 15, 16]
 
 export function SettingsDialog(): JSX.Element {
-  const { settingsOpen, closeSettings, themePreference, editorFontSize, saveSettings } =
+  const {
+    settingsOpen,
+    closeSettings,
+    themePreference,
+    editorFontSize,
+    analyticsEnabled,
+    saveSettings
+  } =
     useAppStore()
 
   const handleTheme = async (theme: 'auto' | 'dark' | 'light'): Promise<void> => {
@@ -36,6 +44,14 @@ export function SettingsDialog(): JSX.Element {
     } else if (theme === 'light') {
       document.documentElement.classList.remove('dark')
     }
+  }
+
+  const handleAnalyticsToggle = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ): Promise<void> => {
+    const enabled = event.target.checked
+    await saveSettings({ analyticsEnabled: enabled })
+    setAnalyticsEnabled(enabled)
   }
 
   return (
@@ -93,6 +109,23 @@ export function SettingsDialog(): JSX.Element {
                 </button>
               ))}
             </div>
+          </div>
+
+          <Separator />
+
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-medium text-foreground/70">Usage Analytics</p>
+              <p className="text-2xs text-muted-foreground">
+                Share anonymous usage data to improve Table.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={analyticsEnabled}
+              onChange={handleAnalyticsToggle}
+              className="h-4 w-4 rounded border-input"
+            />
           </div>
         </div>
       </DialogContent>

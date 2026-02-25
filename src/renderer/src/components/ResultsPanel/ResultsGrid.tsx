@@ -11,6 +11,7 @@ import { useAppStore } from '../../store/useAppStore'
 import { cellValueToString, cn } from '../../lib/utils'
 import { Loader2, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { toast } from '../../hooks/use-toast'
+import { trackEvent } from '../../lib/analytics'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -255,6 +256,7 @@ export function ResultsGrid({
       setSavingRows((p) => new Set(p).add(rowIdx))
       try {
         await window.api.query.updateRow({ connectionId, schema, table, primaryKeys: pks, pkValues, updates })
+        trackEvent('rows_updated', { count: 1 })
         setPendingEdits((prev) => { const next = new Map(prev); next.delete(String(rowIdx)); return next })
         toast({ title: 'Row updated' })
       } catch (err) {

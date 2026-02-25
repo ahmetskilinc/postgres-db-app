@@ -5,6 +5,7 @@ import { useAppStore } from '../../store/useAppStore'
 import { Button } from '../ui/button'
 import { Play, Loader2 } from 'lucide-react'
 import { TableBrowser } from '../ResultsPanel/TableBrowser'
+import { toBucket, trackEvent } from '../../lib/analytics'
 
 export function EditorTab(): JSX.Element {
   const { tabs, activeTabId, activeConnectionId, connectedIds, updateTab, theme, editorFontSize } = useAppStore()
@@ -25,7 +26,10 @@ export function EditorTab(): JSX.Element {
 
     const disposable = monaco.languages.registerCompletionItemProvider('sql', {
       triggerCharacters: [' ', '.', '"', "'"],
-      provideCompletionItems: (model, position) => {
+      provideCompletionItems: (
+        model: Monaco.editor.ITextModel,
+        position: Monaco.Position
+      ) => {
         const { schemaStates, activeConnectionId } = useAppStore.getState()
         if (!activeConnectionId) return { suggestions: [] }
         const state = schemaStates[activeConnectionId]
@@ -122,6 +126,11 @@ export function EditorTab(): JSX.Element {
     try {
       const result = await window.api.query.execute(activeConnectionId, sql.trim())
       updateTab(activeTabId, { result, isLoading: false })
+      trackEvent('query_executed', {
+        success: true,
+        durationBucket: toBucket(result.durationMs, [50, 100, 250, 500, 1000, 2000]),
+        rowCountBucket: toBucket(result.rowCount ?? 0, [0, 1, 10, 100, 1000, 10000])
+      })
 
       await window.api.history.add({
         connectionId: activeConnectionId,
@@ -131,6 +140,9 @@ export function EditorTab(): JSX.Element {
         rowCount: result.rowCount
       })
     } catch (err) {
+      trackEvent('query_executed', {
+        success: false
+      })
       updateTab(activeTabId, {
         error: (err as Error).message,
         isLoading: false
