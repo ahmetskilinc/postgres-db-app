@@ -192,6 +192,8 @@ const api = {
     }
   },
   updater: {
+    download: (): Promise<void> => ipcRenderer.invoke('updater:download'),
+    quitAndInstall: (): Promise<void> => ipcRenderer.invoke('updater:quitAndInstall'),
     onUpdateAvailable: (callback: () => void): (() => void) => {
       ipcRenderer.on('update-available', callback)
       return () => ipcRenderer.removeListener('update-available', callback)
@@ -199,6 +201,35 @@ const api = {
     onUpdateDownloaded: (callback: () => void): (() => void) => {
       ipcRenderer.on('update-downloaded', callback)
       return () => ipcRenderer.removeListener('update-downloaded', callback)
+    },
+    onUpdateNotAvailable: (callback: () => void): (() => void) => {
+      ipcRenderer.on('update-not-available', callback)
+      return () => ipcRenderer.removeListener('update-not-available', callback)
+    },
+    onDownloadProgress: (
+      callback: (progress: {
+        bytesPerSecond: number
+        percent: number
+        transferred: number
+        total: number
+      }) => void
+    ): (() => void) => {
+      const listener = (
+        _e: Electron.IpcRendererEvent,
+        progress: {
+          bytesPerSecond: number
+          percent: number
+          transferred: number
+          total: number
+        }
+      ): void => callback(progress)
+      ipcRenderer.on('download-progress', listener)
+      return () => ipcRenderer.removeListener('download-progress', listener)
+    },
+    onUpdateError: (callback: (message: string) => void): (() => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, message: string): void => callback(message)
+      ipcRenderer.on('update-error', listener)
+      return () => ipcRenderer.removeListener('update-error', listener)
     }
   }
 }

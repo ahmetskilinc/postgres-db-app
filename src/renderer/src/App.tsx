@@ -17,7 +17,7 @@ import { TooltipProvider } from './components/ui/tooltip'
 import { initAnalytics, setAnalyticsEnabled, trackEvent } from './lib/analytics'
 
 export default function App(): JSX.Element {
-  const { theme, setTheme, setUpdateAvailable, openSettings, loadSettings, historyPanelOpen } =
+  const { theme, setTheme, setUpdaterState, openSettings, loadSettings, historyPanelOpen } =
     useAppStore()
 
   useEffect(() => {
@@ -42,11 +42,22 @@ export default function App(): JSX.Element {
     })
 
     const unlistenUpdate = window.api.updater.onUpdateAvailable(() => {
-      setUpdateAvailable(true)
+      setUpdaterState({ status: 'available', progress: null, error: null })
       trackEvent('update_available')
     })
     const unlistenDownloaded = window.api.updater.onUpdateDownloaded(() => {
+      setUpdaterState({ status: 'downloaded', progress: 100, error: null })
       trackEvent('update_downloaded')
+    })
+    const unlistenNotAvailable = window.api.updater.onUpdateNotAvailable(() => {
+      setUpdaterState({ status: 'idle', progress: null, error: null })
+    })
+    const unlistenProgress = window.api.updater.onDownloadProgress((progress) => {
+      setUpdaterState({ status: 'downloading', progress: progress.percent, error: null })
+    })
+    const unlistenError = window.api.updater.onUpdateError((message) => {
+      setUpdaterState({ status: 'error', progress: null, error: message })
+      trackEvent('update_error', { message })
     })
     const unlistenSettings = window.api.settings.onOpenRequest(() => openSettings())
 
@@ -54,6 +65,9 @@ export default function App(): JSX.Element {
       unlisten()
       unlistenUpdate()
       unlistenDownloaded()
+      unlistenNotAvailable()
+      unlistenProgress()
+      unlistenError()
       unlistenSettings()
     }
   }, [])

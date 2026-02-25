@@ -33,7 +33,9 @@ interface AppState {
   editingConnectionId: string | null;
   schemaStates: Record<string, SchemaNode>;
   latency: Record<string, number | null>;
-  updateAvailable: boolean;
+  updaterStatus: "idle" | "available" | "downloading" | "downloaded" | "error";
+  updaterProgress: number | null;
+  updaterError: string | null;
   settingsOpen: boolean;
   editorFontSize: number;
   themePreference: "auto" | "dark" | "light";
@@ -57,7 +59,11 @@ interface AppState {
   loadTables: (connectionId: string, schema: string) => Promise<void>;
   setLatency: (connectionId: string, ms: number | null) => void;
   openTableBrowser: (connectionId: string, schema: string, table: string) => void;
-  setUpdateAvailable: (val: boolean) => void;
+  setUpdaterState: (state: {
+    status: "idle" | "available" | "downloading" | "downloaded" | "error";
+    progress?: number | null;
+    error?: string | null;
+  }) => void;
   openSettings: () => void;
   closeSettings: () => void;
   loadSettings: () => Promise<void>;
@@ -100,7 +106,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   editingConnectionId: null,
   schemaStates: {},
   latency: {},
-  updateAvailable: false,
+  updaterStatus: "idle",
+  updaterProgress: null,
+  updaterError: null,
   settingsOpen: false,
   editorFontSize: 13,
   themePreference: "auto" as const,
@@ -284,7 +292,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ activeTabId: tabId });
   },
 
-  setUpdateAvailable: (val) => set({ updateAvailable: val }),
+  setUpdaterState: (state) =>
+    set((s) => ({
+      updaterStatus: state.status,
+      updaterProgress: state.progress ?? (state.status === "downloading" ? s.updaterProgress : null),
+      updaterError: state.error ?? (state.status === "error" ? s.updaterError : null),
+    })),
 
   openSettings: () => set({ settingsOpen: true }),
   closeSettings: () => set({ settingsOpen: false }),

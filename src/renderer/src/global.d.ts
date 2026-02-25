@@ -109,8 +109,18 @@ declare global {
         onChange(callback: (theme: 'dark' | 'light') => void): () => void
       }
       updater: {
+        download(): Promise<void>
+        quitAndInstall(): Promise<void>
         onUpdateAvailable(callback: () => void): () => void
         onUpdateDownloaded(callback: () => void): () => void
+        onUpdateNotAvailable(callback: () => void): () => void
+        onDownloadProgress(callback: (progress: {
+          bytesPerSecond: number
+          percent: number
+          transferred: number
+          total: number
+        }) => void): () => void
+        onUpdateError(callback: (message: string) => void): () => void
       }
     }
   }

@@ -9,8 +9,8 @@ let analyticsEnabled = true
 let analyticsReady = false
 
 function envClientId(): string | undefined {
-  const meta = import.meta as ImportMeta & { env: Record<string, string | undefined> }
-  return meta.env.VITE_DATABUDDY_CLIENT_ID
+  const meta = import.meta as ImportMeta & { env?: Record<string, string | undefined> }
+  return meta.env?.VITE_DATABUDDY_CLIENT_ID
 }
 
 function sanitizeProperties(props: EventProps = {}): EventProps {
