@@ -10,6 +10,7 @@ import { QueryResultPanel } from './components/ResultsPanel/QueryResultPanel'
 import { StatusBar } from './components/StatusBar/StatusBar'
 import { ConnectionDialog } from './components/Dialogs/ConnectionDialog'
 import { SettingsDialog } from './components/Dialogs/SettingsDialog'
+import { CommandPalette } from './components/CommandPalette/CommandPalette'
 import { Toaster } from './components/ui/toaster'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './components/ui/resizable'
 import { TooltipProvider } from './components/ui/tooltip'
@@ -89,6 +90,7 @@ export default function App(): JSX.Element {
         <StatusBar />
         <ConnectionDialog />
         <SettingsDialog />
+        <CommandPalette />
         <Toaster />
       </div>
     </TooltipProvider>

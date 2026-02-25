@@ -66,6 +66,10 @@ interface AppState {
   cacheColumns: (connectionId: string, schema: string, table: string, columns: ColumnInfo[]) => void;
   inspectedRow: { row: Record<string, unknown>; fields: { name: string; dataTypeID: number }[] } | null;
   setInspectedRow: (row: Record<string, unknown> | null, fields?: { name: string; dataTypeID: number }[]) => void;
+  commandPaletteOpen: boolean;
+  openCommandPalette: () => void;
+  closeCommandPalette: () => void;
+  toggleCommandPalette: () => void;
 }
 
 function makeDefaultTab(init?: Partial<EditorTab>): EditorTab {
@@ -313,4 +317,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     });
   },
+
+  commandPaletteOpen: false,
+  openCommandPalette: () => set({ commandPaletteOpen: true }),
+  closeCommandPalette: () => set({ commandPaletteOpen: false }),
+  toggleCommandPalette: () => set((s) => ({ commandPaletteOpen: !s.commandPaletteOpen })),
 }));
