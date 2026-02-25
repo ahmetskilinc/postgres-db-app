@@ -8,12 +8,10 @@ on:
         required: true
         type: string
       release_type:
-        description: "Release type (optional)"
+        description: "Preview release?"
         required: false
-        type: select
-        options:
-          - "release"
-          - "pre-release"
+        type: boolean
+        default: false
       release_name:
         description: "Release title (optional)"
         required: false
@@ -60,7 +58,7 @@ jobs:
             TAG="${GITHUB_REF_NAME}"
             NAME="Table ${TAG}"
             NOTES=""
-            RELEASE_TYPE="${{ github.event_name == 'workflow_dispatch' ? 'release' : 'pre-release' }}"
+            RELEASE_TYPE="release"
           fi
           VERSION="${TAG#v}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
