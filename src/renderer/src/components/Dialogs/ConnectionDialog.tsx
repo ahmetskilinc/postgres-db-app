@@ -181,7 +181,6 @@ export function ConnectionDialog(): JSX.Element {
     setTestResult(null)
     try {
       const effective = getEffectiveForm()
-      console.log('[handleTest] tab:', tab, 'connStr:', connStr, 'form.username:', form.username, 'effective.username:', effective.username)
       const result = await window.api.connections.test({
         host: effective.host,
         port: parseInt(effective.port) || 5432,
