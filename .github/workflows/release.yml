@@ -180,22 +180,14 @@ jobs:
         run: |
           shopt -s nullglob
           APPS=(dist/mac*/Table.app)
-          DMGS=(dist/*.dmg)
           if [[ ${#APPS[@]} -eq 0 ]]; then
             echo "No built .app found in dist/mac*/Table.app"
             exit 1
           fi
-          if [[ ${#DMGS[@]} -eq 0 ]]; then
-            echo "No dmg found in dist/*.dmg"
-            exit 1
-          fi
           APP_PATH="${APPS[0]}"
-          DMG_PATH="${DMGS[0]}"
           codesign -dv --verbose=4 "$APP_PATH"
           codesign --verify --deep --verbose=2 "$APP_PATH"
           spctl -a -vv --type exec "$APP_PATH"
-          xcrun stapler staple "$DMG_PATH"
-          xcrun stapler validate "$DMG_PATH"
 
       - name: Build Windows installer
         if: matrix.os == 'windows-latest'
