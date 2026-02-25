@@ -80,9 +80,6 @@
       "out/**/*"
     ],
     "mac": {
-      "notarize": {
-        "teamId": "DS2JFEEZDM"
-      },
       "target": [
         {
           "target": "dmg",
