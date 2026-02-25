@@ -8,10 +8,13 @@ on:
         required: true
         type: string
       release_type:
-        description: "Preview release?"
+        description: "Release type"
         required: false
-        type: boolean
-        default: false
+        type: choice
+        options:
+          - release
+          - preview
+        default: release
       release_name:
         description: "Release title (optional)"
         required: false
@@ -50,7 +53,7 @@ jobs:
             TAG="${{ inputs.tag }}"
             NAME="${{ inputs.release_name }}"
             NOTES="${{ inputs.release_notes }}"
-            RELEASE_TYPE="${{ inputs.release_type | default: 'release' }}"
+            RELEASE_TYPE="${{ inputs.release_type }}"
             if [[ -z "$NAME" ]]; then
               NAME="Table ${TAG}"
             fi
@@ -232,6 +235,7 @@ jobs:
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
           name: ${{ needs.prepare.outputs.release_name }}
+          prerelease: ${{ needs.prepare.outputs.release_type == 'preview' }}
           generate_release_notes: true
           append_body: true
           body: ${{ needs.prepare.outputs.release_notes }}
