@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -36,6 +36,8 @@ interface Props {
   pendingNewRow?: boolean
   onCancelNewRow?: () => void
   onCommitNewRow?: (values: Record<string, unknown>) => Promise<void>
+  searchTerm?: string
+  scrollToRow?: number
 }
 
 interface EditState {
@@ -56,7 +58,9 @@ export function ResultsGrid({
   onFilterByValue,
   pendingNewRow,
   onCancelNewRow,
-  onCommitNewRow
+  onCommitNewRow,
+  searchTerm,
+  scrollToRow
 }: Props): JSX.Element {
   const [pendingEdits, setPendingEdits] = useState<Map<string, Record<string, unknown>>>(new Map())
   const [editCell, setEditCell] = useState<EditState | null>(null)
@@ -68,6 +72,38 @@ export function ResultsGrid({
   const isEditable = Boolean(connectionId && schema && table)
   const canEdit = isEditable && pendingEdits.size > 0
   const hasSelection = selectedRows !== undefined && onRowSelect !== undefined
+
+  const normalizedSearch = useMemo(() => searchTerm?.toLowerCase() ?? '', [searchTerm])
+
+  const highlightText = useCallback(
+    (text: string): React.ReactNode => {
+      if (!normalizedSearch || !text) return text
+      const lower = text.toLowerCase()
+      const idx = lower.indexOf(normalizedSearch)
+      if (idx === -1) return text
+      const parts: React.ReactNode[] = []
+      let lastEnd = 0
+      let pos = idx
+      let key = 0
+      // Find all occurrences
+      while (pos !== -1) {
+        if (pos > lastEnd) parts.push(text.slice(lastEnd, pos))
+        parts.push(
+          <mark
+            key={key++}
+            className="rounded-sm bg-orange-400/30 text-orange-700 dark:bg-orange-500/25 dark:text-orange-300"
+          >
+            {text.slice(pos, pos + normalizedSearch.length)}
+          </mark>
+        )
+        lastEnd = pos + normalizedSearch.length
+        pos = lower.indexOf(normalizedSearch, lastEnd)
+      }
+      if (lastEnd < text.length) parts.push(text.slice(lastEnd))
+      return parts
+    },
+    [normalizedSearch]
+  )
 
   const columns: ColumnDef<Record<string, unknown>>[] = fields.map((field) => ({
     id: field.name,
@@ -109,19 +145,23 @@ export function ResultsGrid({
         )
       }
 
+      const hasMatch = normalizedSearch.length > 0 && rawValue !== null &&
+        displayValue.toLowerCase().includes(normalizedSearch)
+
       const cellEl = (
         <div
           className={cn(
             'truncate px-2 py-0.5 font-mono text-xs',
             rawValue === null && 'text-muted-foreground/40',
-            isModified && 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+            isModified && 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+            hasMatch && 'bg-orange-500/8'
           )}
           onDoubleClick={() => isEditable && setEditCell({ rowIdx, col: colId })}
           title={displayValue}
         >
           {rawValue === null ? (
             <span className="font-sans italic text-muted-foreground/40">NULL</span>
-          ) : displayValue}
+          ) : normalizedSearch ? highlightText(displayValue) : displayValue}
         </div>
       )
 
@@ -190,6 +230,12 @@ export function ResultsGrid({
     estimateSize: () => 26,
     overscan: 20
   })
+
+  useEffect(() => {
+    if (scrollToRow !== undefined && scrollToRow >= 0 && scrollToRow < tableRows.length) {
+      rowVirtualizer.scrollToIndex(scrollToRow, { align: 'center', behavior: 'smooth' })
+    }
+  }, [scrollToRow, rowVirtualizer, tableRows.length])
 
   const virtualItems = rowVirtualizer.getVirtualItems()
   const totalSize = rowVirtualizer.getTotalSize()
