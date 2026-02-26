@@ -31,6 +31,7 @@ export function CommandPalette(): JSX.Element {
 
   const [connectingId, setConnectingId] = useState<string | null>(null)
   const [showAllTables, setShowAllTables] = useState(false)
+  const [search, setSearch] = useState('')
 
   const isConnected = activeConnectionId ? connectedIds.includes(activeConnectionId) : false
   const schemaState = activeConnectionId ? schemaStates[activeConnectionId] : undefined
@@ -40,6 +41,7 @@ export function CommandPalette(): JSX.Element {
     if (commandPaletteOpen) {
       setShowAllTables(false)
       setConnectingId(null)
+      setSearch('')
     }
   }, [commandPaletteOpen])
 
@@ -106,8 +108,9 @@ export function CommandPalette(): JSX.Element {
     return result
   }, [schemaState])
 
-  const visibleTables = showAllTables ? allTables : allTables.slice(0, TABLE_PREVIEW_COUNT)
-  const hasMoreTables = allTables.length > TABLE_PREVIEW_COUNT
+  const isSearching = search.trim().length > 0
+  const visibleTables = (isSearching || showAllTables) ? allTables : allTables.slice(0, TABLE_PREVIEW_COUNT)
+  const hasMoreTables = !isSearching && allTables.length > TABLE_PREVIEW_COUNT
 
   const handleSelectTable = (schema: string, table: string): void => {
     if (!activeConnectionId) return
@@ -155,6 +158,8 @@ export function CommandPalette(): JSX.Element {
       overlayClassName="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
     >
       <Command.Input
+        value={search}
+        onValueChange={setSearch}
         placeholder={isConnected ? 'Search tables, views, columns...' : 'Search connections...'}
         className={cn(
           'h-10 w-full border-b border-border bg-transparent px-4',
