@@ -60,6 +60,17 @@ export default function App(): JSX.Element {
       trackEvent('update_error', { message })
     })
     const unlistenSettings = window.api.settings.onOpenRequest(() => openSettings())
+    const unlistenCloseTabOrWindow = window.api.window.onCloseTabOrWindowRequest(() => {
+      const { tabs, activeTabId, closeTab } = useAppStore.getState()
+      if (tabs.length <= 1) {
+        void window.api.window.close()
+        return
+      }
+      const tabId = activeTabId ?? tabs[0]?.id
+      if (tabId) {
+        closeTab(tabId)
+      }
+    })
 
     return () => {
       unlisten()
@@ -69,6 +80,7 @@ export default function App(): JSX.Element {
       unlistenProgress()
       unlistenError()
       unlistenSettings()
+      unlistenCloseTabOrWindow()
     }
   }, [])
 

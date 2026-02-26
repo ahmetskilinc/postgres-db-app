@@ -2,6 +2,17 @@ import { Menu, app, BrowserWindow, shell } from 'electron'
 
 export function buildAppMenu(): void {
   const isMac = process.platform === 'darwin'
+  const sendToFocusedWindow = (channel: string): void => {
+    const win = BrowserWindow.getFocusedWindow()
+    if (win && !win.isDestroyed()) {
+      win.webContents.send(channel)
+      return
+    }
+    const firstWindow = BrowserWindow.getAllWindows()[0]
+    if (firstWindow && !firstWindow.isDestroyed()) {
+      firstWindow.webContents.send(channel)
+    }
+  }
 
   const template: Electron.MenuItemConstructorOptions[] = [
     ...(isMac
@@ -39,22 +50,33 @@ export function buildAppMenu(): void {
           label: 'New Tab',
           accelerator: 'CmdOrCtrl+T',
           click: () => {
-            BrowserWindow.getAllWindows().forEach((win) => {
-              win.webContents.send('new-tab')
-            })
+            sendToFocusedWindow('new-tab')
           }
         },
         {
           label: 'New Connection',
           accelerator: 'CmdOrCtrl+N',
           click: () => {
-            BrowserWindow.getAllWindows().forEach((win) => {
-              win.webContents.send('new-connection')
-            })
+            sendToFocusedWindow('new-connection')
           }
         },
         { type: 'separator' },
-        isMac ? { role: 'close' } : { role: 'quit' }
+        {
+          label: 'Close Tab or Window',
+          accelerator: 'CmdOrCtrl+W',
+          click: () => {
+            sendToFocusedWindow('close-tab-or-window')
+          }
+        },
+        ...(isMac
+          ? []
+          : ([
+              {
+                label: 'Quit',
+                accelerator: 'CmdOrCtrl+Q',
+                role: 'quit'
+              }
+            ] as Electron.MenuItemConstructorOptions[]))
       ]
     },
     {
@@ -93,7 +115,15 @@ export function buildAppMenu(): void {
               { type: 'separator' },
               { role: 'front' }
             ] as Electron.MenuItemConstructorOptions[])
-          : ([{ role: 'close' }] as Electron.MenuItemConstructorOptions[]))
+          : ([
+              {
+                label: 'Close Tab or Window',
+                accelerator: 'CmdOrCtrl+W',
+                click: () => {
+                  sendToFocusedWindow('close-tab-or-window')
+                }
+              }
+            ] as Electron.MenuItemConstructorOptions[]))
       ]
     }
   ]

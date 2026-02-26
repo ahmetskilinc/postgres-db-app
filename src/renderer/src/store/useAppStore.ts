@@ -40,6 +40,7 @@ interface AppState {
   editorFontSize: number;
   themePreference: "auto" | "dark" | "light";
   analyticsEnabled: boolean;
+  preReleaseUpdates: boolean;
 
   loadConnections: () => Promise<void>;
   setActiveConnection: (id: string | null) => void;
@@ -67,7 +68,7 @@ interface AppState {
   openSettings: () => void;
   closeSettings: () => void;
   loadSettings: () => Promise<void>;
-  saveSettings: (s: Partial<{ theme: "auto" | "dark" | "light"; editorFontSize: number; analyticsEnabled: boolean }>) => Promise<void>;
+  saveSettings: (s: Partial<{ theme: "auto" | "dark" | "light"; editorFontSize: number; analyticsEnabled: boolean; preReleaseUpdates: boolean }>) => Promise<void>;
   historyPanelOpen: boolean;
   toggleHistoryPanel: () => void;
   cacheColumns: (connectionId: string, schema: string, table: string, columns: ColumnInfo[]) => void;
@@ -113,6 +114,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   editorFontSize: 13,
   themePreference: "auto" as const,
   analyticsEnabled: true,
+  preReleaseUpdates: false,
   historyPanelOpen: false,
   inspectedRow: null,
 
@@ -308,7 +310,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       themePreference: settings.theme,
       editorFontSize: settings.editorFontSize,
-      analyticsEnabled: settings.analyticsEnabled
+      analyticsEnabled: settings.analyticsEnabled,
+      preReleaseUpdates: settings.preReleaseUpdates
     });
   },
 
@@ -318,7 +321,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       themePreference: updated.theme,
       editorFontSize: updated.editorFontSize,
-      analyticsEnabled: updated.analyticsEnabled
+      analyticsEnabled: updated.analyticsEnabled,
+      preReleaseUpdates: updated.preReleaseUpdates
     });
   },
 

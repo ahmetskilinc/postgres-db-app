@@ -91,19 +91,26 @@ declare global {
           theme: 'auto' | 'dark' | 'light'
           editorFontSize: number
           analyticsEnabled: boolean
+          preReleaseUpdates: boolean
         }>
         set(
           settings: Partial<{
             theme: 'auto' | 'dark' | 'light'
             editorFontSize: number
             analyticsEnabled: boolean
+            preReleaseUpdates: boolean
           }>
         ): Promise<{
           theme: 'auto' | 'dark' | 'light'
           editorFontSize: number
           analyticsEnabled: boolean
+          preReleaseUpdates: boolean
         }>
         onOpenRequest(callback: () => void): () => void
+      }
+      window: {
+        close(): Promise<void>
+        onCloseTabOrWindowRequest(callback: () => void): () => void
       }
       theme: {
         onChange(callback: (theme: 'dark' | 'light') => void): () => void

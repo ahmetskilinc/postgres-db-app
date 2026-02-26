@@ -165,6 +165,7 @@ const api = {
       theme: 'auto' | 'dark' | 'light'
       editorFontSize: number
       analyticsEnabled: boolean
+      preReleaseUpdates: boolean
     }> =>
       ipcRenderer.invoke('settings:get'),
     set: (
@@ -172,15 +173,24 @@ const api = {
         theme: 'auto' | 'dark' | 'light'
         editorFontSize: number
         analyticsEnabled: boolean
+        preReleaseUpdates: boolean
       }>
     ): Promise<{
       theme: 'auto' | 'dark' | 'light'
       editorFontSize: number
       analyticsEnabled: boolean
+      preReleaseUpdates: boolean
     }> => ipcRenderer.invoke('settings:set', settings),
     onOpenRequest: (callback: () => void): (() => void) => {
       ipcRenderer.on('open-settings', callback)
       return () => ipcRenderer.removeListener('open-settings', callback)
+    }
+  },
+  window: {
+    close: (): Promise<void> => ipcRenderer.invoke('window:close'),
+    onCloseTabOrWindowRequest: (callback: () => void): (() => void) => {
+      ipcRenderer.on('close-tab-or-window', callback)
+      return () => ipcRenderer.removeListener('close-tab-or-window', callback)
     }
   },
   theme: {

@@ -33,6 +33,7 @@ export function SettingsDialog(): JSX.Element {
     themePreference,
     editorFontSize,
     analyticsEnabled,
+    preReleaseUpdates,
     saveSettings
   } =
     useAppStore()
@@ -52,6 +53,13 @@ export function SettingsDialog(): JSX.Element {
     const enabled = event.target.checked
     await saveSettings({ analyticsEnabled: enabled })
     setAnalyticsEnabled(enabled)
+  }
+
+  const handlePreReleaseToggle = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ): Promise<void> => {
+    const enabled = event.target.checked
+    await saveSettings({ preReleaseUpdates: enabled })
   }
 
   return (
@@ -124,6 +132,23 @@ export function SettingsDialog(): JSX.Element {
               type="checkbox"
               checked={analyticsEnabled}
               onChange={handleAnalyticsToggle}
+              className="h-4 w-4 rounded border-input"
+            />
+          </div>
+
+          <Separator />
+
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-medium text-foreground/70">Pre-release Updates</p>
+              <p className="text-2xs text-muted-foreground">
+                Receive preview builds before stable releases.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={preReleaseUpdates}
+              onChange={handlePreReleaseToggle}
               className="h-4 w-4 rounded border-input"
             />
           </div>

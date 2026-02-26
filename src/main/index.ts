@@ -87,6 +87,12 @@ app.whenReady().then(() => {
   ipcMain.handle('updater:quitAndInstall', () => {
     autoUpdater.quitAndInstall()
   })
+  ipcMain.handle('window:close', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (win && !win.isDestroyed()) {
+      win.close()
+    }
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
