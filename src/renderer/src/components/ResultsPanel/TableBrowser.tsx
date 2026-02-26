@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
+import { useHotkey } from '@tanstack/react-hotkeys'
 import { useAppStore, type EditorTab } from '../../store/useAppStore'
 import { ResultsGrid, type SortState } from './ResultsGrid'
 import { Button } from '../ui/button'
@@ -235,6 +236,18 @@ export function TableBrowser({ tab }: { tab: EditorTab }): JSX.Element {
     setFilterMode(mode)
     setTimeout(() => filterRef.current?.focus(), 0)
   }
+
+  // Cmd+F / Ctrl+F: focus search bar, toggle mode on repeat press
+  useHotkey('Mod+F', () => {
+    const isFocused = document.activeElement === filterRef.current
+    if (!isFocused) {
+      // First press: just focus the input in its current mode
+      filterRef.current?.focus()
+    } else {
+      // Already focused: toggle between search and query mode
+      handleSwitchMode(filterMode === 'search' ? 'query' : 'search')
+    }
+  }, { ignoreInputs: false })
 
   // --- Row operations ---
 
