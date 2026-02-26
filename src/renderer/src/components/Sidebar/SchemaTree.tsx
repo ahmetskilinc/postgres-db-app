@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { ScrollArea } from '../ui/scroll-area'
 import { Separator } from '../ui/separator'
@@ -122,9 +122,16 @@ function TableRow({
 }): JSX.Element {
   const [expanded, setExpanded] = useState(false)
   const [loading, setLoading] = useState(false)
+  const toggleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { cacheColumns, schemaStates } = useAppStore()
   const cacheKey = `${table.schema}.${table.name}`
   const columns = schemaStates[connectionId]?.columns[cacheKey] ?? null
+
+  useEffect(() => {
+    return () => {
+      if (toggleTimeoutRef.current) clearTimeout(toggleTimeoutRef.current)
+    }
+  }, [])
 
   const Icon = table.type === 'VIEW' || table.type === 'MATERIALIZED VIEW' ? Eye : Table2
 
@@ -141,11 +148,36 @@ function TableRow({
     setExpanded((e) => !e)
   }
 
+  const handleClick = (): void => {
+    if (toggleTimeoutRef.current) {
+      clearTimeout(toggleTimeoutRef.current)
+      toggleTimeoutRef.current = null
+      onOpen()
+      if (columns === null) {
+        setLoading(true)
+        window.api.schema
+          .getColumns(connectionId, table.schema, table.name)
+          .then((cols) => {
+            cacheColumns(connectionId, table.schema, table.name, cols)
+            setExpanded(true)
+          })
+          .finally(() => setLoading(false))
+      } else {
+        setExpanded(true)
+      }
+      return
+    }
+    toggleTimeoutRef.current = setTimeout(() => {
+      toggleTimeoutRef.current = null
+      void handleToggle()
+    }, 250)
+  }
+
   return (
     <div>
       <div className="group flex w-full items-center text-xs text-sidebar-foreground hover:bg-accent/50 transition-colors">
         <button
-          onClick={handleToggle}
+          onClick={handleClick}
           className="flex flex-1 items-center gap-2 py-1 pl-7 pr-1 min-w-0"
         >
           <ChevronRight
