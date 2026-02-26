@@ -63,6 +63,21 @@ export interface QueryHistoryEntry {
   rowCount?: number
 }
 
+export interface SessionTab {
+  id: string
+  title: string
+  sql: string
+  mode: 'query' | 'table'
+  tableMeta: { schema: string; table: string; connectionId: string } | null
+  connectionId: string | null
+}
+
+export interface SessionState {
+  activeConnectionId: string | null
+  activeTabId: string | null
+  tabs: SessionTab[]
+}
+
 const api = {
   connections: {
     list: (): Promise<SavedConnection[]> => ipcRenderer.invoke('connections:list'),
@@ -159,6 +174,10 @@ const api = {
       ipcRenderer.invoke('history:list', connectionId),
     clear: (connectionId?: string): Promise<void> =>
       ipcRenderer.invoke('history:clear', connectionId)
+  },
+  session: {
+    get: (): Promise<SessionState> => ipcRenderer.invoke('session:get'),
+    save: (session: SessionState): Promise<void> => ipcRenderer.invoke('session:save', session)
   },
   settings: {
     get: (): Promise<{

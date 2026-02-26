@@ -86,6 +86,32 @@ declare global {
         list(connectionId?: string): Promise<QueryHistoryEntry[]>
         clear(connectionId?: string): Promise<void>
       }
+      session: {
+        get(): Promise<{
+          activeConnectionId: string | null
+          activeTabId: string | null
+          tabs: {
+            id: string
+            title: string
+            sql: string
+            mode: 'query' | 'table'
+            tableMeta: { schema: string; table: string; connectionId: string } | null
+            connectionId: string | null
+          }[]
+        }>
+        save(session: {
+          activeConnectionId: string | null
+          activeTabId: string | null
+          tabs: {
+            id: string
+            title: string
+            sql: string
+            mode: 'query' | 'table'
+            tableMeta: { schema: string; table: string; connectionId: string } | null
+            connectionId: string | null
+          }[]
+        }): Promise<void>
+      }
       settings: {
         get(): Promise<{
           theme: 'auto' | 'dark' | 'light'

@@ -22,6 +22,15 @@ export interface SchemaNode {
   columns: Record<string, ColumnInfo[]>;
 }
 
+export interface SessionTab {
+  id: string;
+  title: string;
+  sql: string;
+  mode: "query" | "table";
+  tableMeta: { schema: string; table: string; connectionId: string } | null;
+  connectionId: string | null;
+}
+
 interface AppState {
   connections: SavedConnection[];
   activeConnectionId: string | null;
@@ -78,6 +87,9 @@ interface AppState {
   openCommandPalette: () => void;
   closeCommandPalette: () => void;
   toggleCommandPalette: () => void;
+
+  restoreSession: () => Promise<void>;
+  saveSession: () => void;
 }
 
 function makeDefaultTab(init?: Partial<EditorTab>): EditorTab {
@@ -349,4 +361,79 @@ export const useAppStore = create<AppState>((set, get) => ({
   openCommandPalette: () => set({ commandPaletteOpen: true }),
   closeCommandPalette: () => set({ commandPaletteOpen: false }),
   toggleCommandPalette: () => set((s) => ({ commandPaletteOpen: !s.commandPaletteOpen })),
+
+  restoreSession: async () => {
+    if (!window.api?.session) return;
+    const session = await window.api.session.get();
+    if (!session || session.tabs.length === 0) return;
+
+    // Reconnect FIRST so table browser tabs don't fire fetches before
+    // the connection pool is ready.
+    if (session.activeConnectionId) {
+      try {
+        await window.api.connections.connect(session.activeConnectionId);
+        get().setConnected(session.activeConnectionId, true);
+        get().setActiveConnection(session.activeConnectionId);
+      } catch {
+        // Connection may no longer be valid — silently skip
+      }
+    }
+
+    // Now restore tabs — table browsers will mount and fetch against
+    // the already-live connection.
+    const restoredTabs: EditorTab[] = session.tabs.map((st: SessionTab) => ({
+      id: st.id,
+      title: st.title,
+      sql: st.sql,
+      result: null,
+      tableData: null,
+      mode: st.mode,
+      tableMeta: st.tableMeta,
+      isLoading: false,
+      error: null,
+      connectionId: st.connectionId,
+    }));
+
+    set({
+      tabs: restoredTabs,
+      activeTabId: session.activeTabId ?? restoredTabs[0]?.id ?? null,
+    });
+  },
+
+  saveSession: () => {
+    if (!window.api?.session) return;
+    const { activeConnectionId, activeTabId, tabs } = get();
+    const sessionTabs: SessionTab[] = tabs.map((t) => ({
+      id: t.id,
+      title: t.title,
+      sql: t.sql,
+      mode: t.mode,
+      tableMeta: t.tableMeta,
+      connectionId: t.connectionId,
+    }));
+    window.api.session.save({
+      activeConnectionId,
+      activeTabId,
+      tabs: sessionTabs,
+    });
+  },
 }));
+
+// Auto-save session on relevant state changes (debounced)
+let _saveTimer: ReturnType<typeof setTimeout> | null = null;
+useAppStore.subscribe(
+  (state, prev) => {
+    // Only save when tabs, activeTabId, or activeConnectionId change
+    if (
+      state.tabs === prev.tabs &&
+      state.activeTabId === prev.activeTabId &&
+      state.activeConnectionId === prev.activeConnectionId
+    ) {
+      return;
+    }
+    if (_saveTimer) clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(() => {
+      useAppStore.getState().saveSession();
+    }, 500);
+  }
+);

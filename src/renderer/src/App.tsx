@@ -18,7 +18,7 @@ import { TooltipProvider } from './components/ui/tooltip'
 import { initAnalytics, setAnalyticsEnabled, trackEvent } from './lib/analytics'
 
 export default function App(): JSX.Element {
-  const { theme, setTheme, setUpdaterState, openSettings, loadSettings, historyPanelOpen } =
+  const { theme, setTheme, setUpdaterState, openSettings, loadSettings, loadConnections, restoreSession, historyPanelOpen } =
     useAppStore()
 
   const inspectedRow = useAppStore((s) => s.inspectedRow)
@@ -46,6 +46,8 @@ export default function App(): JSX.Element {
 
     ;(async () => {
       await loadSettings()
+      await loadConnections()
+      await restoreSession()
       const settings = await window.api.settings.get()
       initAnalytics(settings.analyticsEnabled)
       setAnalyticsEnabled(settings.analyticsEnabled)
