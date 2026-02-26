@@ -4,9 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (example: v0.2.0)"
+        description: "Version bump type"
         required: true
-        type: string
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
       release_type:
         description: "Release type"
         required: false
@@ -50,10 +54,56 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            TAG="${{ inputs.tag }}"
+            BUMP_KIND="${{ inputs.tag }}"
             NAME="${{ inputs.release_name }}"
             NOTES="${{ inputs.release_notes }}"
             RELEASE_TYPE="${{ inputs.release_type }}"
+            CURRENT_VERSION="$(bun -e 'const fs = require("fs"); const pkg = JSON.parse(fs.readFileSync("package.json", "utf8")); process.stdout.write(pkg.version);')"
+            LATEST_TAG="$(git tag -l "v[0-9]*.[0-9]*.[0-9]*" --sort=-v:refname | head -n 1)"
+            LATEST_VERSION="${LATEST_TAG#v}"
+            BASE_VERSION="$(bun -e '
+            const [currentVersion, latestVersion] = process.argv.slice(1);
+            const parse = (value) => value.split(".").map((part) => Number(part));
+            const compare = (a, b) => {
+              for (let i = 0; i < 3; i += 1) {
+                if (a[i] > b[i]) return 1;
+                if (a[i] < b[i]) return -1;
+              }
+              return 0;
+            };
+            if (!latestVersion) {
+              process.stdout.write(currentVersion);
+              process.exit(0);
+            }
+            const currentParts = parse(currentVersion);
+            const latestParts = parse(latestVersion);
+            process.stdout.write(compare(latestParts, currentParts) > 0 ? latestVersion : currentVersion);
+            ' "$CURRENT_VERSION" "$LATEST_VERSION")"
+            VERSION="$(bun -e '
+            const [baseVersion, bumpKind] = process.argv.slice(1);
+            if (!["major", "minor", "patch"].includes(bumpKind)) {
+              process.stderr.write(`Invalid bump kind: ${bumpKind}\n`);
+              process.exit(1);
+            }
+            const [major, minor, patch] = baseVersion.split(".").map((part) => Number(part));
+            if ([major, minor, patch].some((part) => Number.isNaN(part))) {
+              process.stderr.write(`Invalid base version: ${baseVersion}\n`);
+              process.exit(1);
+            }
+            const next = { major, minor, patch };
+            if (bumpKind === "major") {
+              next.major += 1;
+              next.minor = 0;
+              next.patch = 0;
+            } else if (bumpKind === "minor") {
+              next.minor += 1;
+              next.patch = 0;
+            } else {
+              next.patch += 1;
+            }
+            process.stdout.write(`${next.major}.${next.minor}.${next.patch}`);
+            ' "$BASE_VERSION" "$BUMP_KIND")"
+            TAG="v${VERSION}"
             if [[ -z "$NAME" ]]; then
               NAME="Table ${TAG}"
             fi
@@ -62,8 +112,8 @@ jobs:
             NAME="Table ${TAG}"
             NOTES=""
             RELEASE_TYPE="release"
+            VERSION="${TAG#v}"
           fi
-          VERSION="${TAG#v}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "release_type=$RELEASE_TYPE" >> "$GITHUB_OUTPUT"
