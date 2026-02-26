@@ -1,10 +1,16 @@
 import { app, ipcMain, nativeTheme, BrowserWindow } from 'electron'
-import { store, type AppSettings } from '../store'
+import { store, type AppSettings, type SessionState } from '../store'
 import updaterPkg from 'electron-updater'
 const { autoUpdater } = updaterPkg
 
 export function registerSettingsHandlers(): void {
   ipcMain.handle('settings:get', () => store.get('settings'))
+
+  ipcMain.handle('session:get', () => store.get('session'))
+
+  ipcMain.handle('session:save', (_e, session: SessionState) => {
+    store.set('session', session)
+  })
 
   ipcMain.handle('settings:set', (_e, settings: Partial<AppSettings>) => {
     const current = store.get('settings')

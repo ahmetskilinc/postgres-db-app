@@ -31,10 +31,26 @@ export interface AppSettings {
   preReleaseUpdates: boolean
 }
 
+export interface SessionTab {
+  id: string
+  title: string
+  sql: string
+  mode: 'query' | 'table'
+  tableMeta: { schema: string; table: string; connectionId: string } | null
+  connectionId: string | null
+}
+
+export interface SessionState {
+  activeConnectionId: string | null
+  activeTabId: string | null
+  tabs: SessionTab[]
+}
+
 interface StoreSchema {
   connections: SavedConnection[]
   queryHistory: QueryHistoryEntry[]
   settings: AppSettings
+  session: SessionState
 }
 
 export const store = new Store<StoreSchema>({
@@ -47,6 +63,11 @@ export const store = new Store<StoreSchema>({
       editorFontSize: 13,
       analyticsEnabled: true,
       preReleaseUpdates: false
+    },
+    session: {
+      activeConnectionId: null,
+      activeTabId: null,
+      tabs: []
     }
   }
 })
