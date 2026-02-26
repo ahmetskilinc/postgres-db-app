@@ -20,6 +20,14 @@ import {
   ContextMenuTrigger
 } from '../ui/context-menu'
 
+interface ContextMenuTarget {
+  rowIdx: number
+  colId: string
+  displayValue: string
+  rawValue: unknown
+  rowData: Record<string, unknown>
+}
+
 export type SortState = { column: string; dir: 'ASC' | 'DESC' } | null
 
 interface Props {
@@ -67,6 +75,7 @@ export function ResultsGrid({
   const [savingRows, setSavingRows] = useState<Set<number>>(new Set())
   const [newRowValues, setNewRowValues] = useState<Record<string, unknown>>({})
   const parentRef = useRef<HTMLDivElement>(null)
+  const [ctxTarget, setCtxTarget] = useState<ContextMenuTarget | null>(null)
 
   const { setInspectedRow } = useAppStore()
   const isEditable = Boolean(connectionId && schema && table)
@@ -105,120 +114,102 @@ export function ResultsGrid({
     [normalizedSearch]
   )
 
-  const columns: ColumnDef<Record<string, unknown>>[] = fields.map((field) => ({
-    id: field.name,
-    accessorKey: field.name,
-    header: field.name,
-    size: 160,
-    cell: ({ row, column }) => {
-      const rowIdx = row.index
-      const colId = column.id
-      const isEditing = editCell?.rowIdx === rowIdx && editCell.col === colId
-      const pendingRow = pendingEdits.get(String(rowIdx))
-      const rawValue = pendingRow?.[colId] ?? row.original[colId]
+  const handleCellContextMenu = useCallback(
+    (e: React.MouseEvent, rowIdx: number, colId: string, rawValue: unknown, rowData: Record<string, unknown>) => {
       const displayValue = cellValueToString(rawValue)
-      const isModified = pendingRow && colId in pendingRow
+      setCtxTarget({ rowIdx, colId, displayValue, rawValue, rowData })
+    },
+    []
+  )
 
-      if (isEditing) {
-        return (
-          <input
-            autoFocus
-            className="w-full bg-primary/10 px-1.5 py-0.5 font-mono text-xs outline-none ring-1 ring-primary"
-            defaultValue={displayValue}
-            onBlur={(e) => {
-              const newVal = e.target.value
-              if (newVal !== cellValueToString(row.original[colId])) {
-                setPendingEdits((prev) => {
-                  const next = new Map(prev)
-                  const existing = next.get(String(rowIdx)) ?? {}
-                  next.set(String(rowIdx), { ...existing, [colId]: newVal })
-                  return next
-                })
-              }
-              setEditCell(null)
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setEditCell(null)
-              if (e.key === 'Enter') e.currentTarget.blur()
-            }}
-          />
-        )
-      }
+  // Refs so the memoized column cell renderer always reads current values
+  // without forcing columns to be recreated on every scroll-triggered render
+  const editCellRef = useRef(editCell)
+  editCellRef.current = editCell
+  const pendingEditsRef = useRef(pendingEdits)
+  pendingEditsRef.current = pendingEdits
+  const normalizedSearchRef = useRef(normalizedSearch)
+  normalizedSearchRef.current = normalizedSearch
+  const highlightTextRef = useRef(highlightText)
+  highlightTextRef.current = highlightText
 
-      const hasMatch = normalizedSearch.length > 0 && rawValue !== null &&
-        displayValue.toLowerCase().includes(normalizedSearch)
+  const columns: ColumnDef<Record<string, unknown>>[] = useMemo(
+    () =>
+      fields.map((field) => ({
+        id: field.name,
+        accessorKey: field.name,
+        header: field.name,
+        size: 160,
+        cell: ({ row, column }) => {
+          const rowIdx = row.index
+          const colId = column.id
+          const currentEditCell = editCellRef.current
+          const currentPendingEdits = pendingEditsRef.current
+          const currentSearch = normalizedSearchRef.current
+          const currentHighlight = highlightTextRef.current
+          const isEditing = currentEditCell?.rowIdx === rowIdx && currentEditCell.col === colId
+          const pendingRow = currentPendingEdits.get(String(rowIdx))
+          const rawValue = pendingRow?.[colId] ?? row.original[colId]
+          const displayValue = cellValueToString(rawValue)
+          const isModified = pendingRow && colId in pendingRow
 
-      const cellEl = (
-        <div
-          className={cn(
-            'truncate px-2 py-0.5 font-mono text-xs',
-            rawValue === null && 'text-muted-foreground/40',
-            isModified && 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-            hasMatch && 'bg-orange-500/8'
-          )}
-          onDoubleClick={() => isEditable && setEditCell({ rowIdx, col: colId })}
-          title={displayValue}
-        >
-          {rawValue === null ? (
-            <span className="font-sans italic text-muted-foreground/40">NULL</span>
-          ) : normalizedSearch ? highlightText(displayValue) : displayValue}
-        </div>
-      )
+          if (isEditing) {
+            return (
+              <input
+                autoFocus
+                className="w-full bg-primary/10 px-1.5 py-0.5 font-mono text-xs outline-none ring-1 ring-primary"
+                defaultValue={displayValue}
+                onBlur={(e) => {
+                  const newVal = e.target.value
+                  if (newVal !== cellValueToString(row.original[colId])) {
+                    setPendingEdits((prev) => {
+                      const next = new Map(prev)
+                      const existing = next.get(String(rowIdx)) ?? {}
+                      next.set(String(rowIdx), { ...existing, [colId]: newVal })
+                      return next
+                    })
+                  }
+                  setEditCell(null)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setEditCell(null)
+                  if (e.key === 'Enter') e.currentTarget.blur()
+                }}
+              />
+            )
+          }
 
-      return (
-        <ContextMenu>
-          <ContextMenuTrigger asChild>{cellEl}</ContextMenuTrigger>
-          <ContextMenuContent>
-            <ContextMenuLabel>Cell — {colId}</ContextMenuLabel>
-            <ContextMenuSeparator />
-            <ContextMenuItem
-              onClick={() => navigator.clipboard.writeText(displayValue)}
+          const hasMatch = currentSearch.length > 0 && rawValue !== null &&
+            displayValue.toLowerCase().includes(currentSearch)
+
+          return (
+            <div
+              className={cn(
+                'truncate px-2 py-0.5 font-mono text-xs',
+                rawValue === null && 'text-muted-foreground/40',
+                isModified && 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+                hasMatch && 'bg-orange-500/8'
+              )}
+              onDoubleClick={() => isEditable && setEditCell({ rowIdx, col: colId })}
+              onContextMenu={(e) => handleCellContextMenu(e, rowIdx, colId, rawValue, row.original)}
+              title={displayValue}
             >
-              Copy value
-            </ContextMenuItem>
-            <ContextMenuItem
-              onClick={() =>
-                navigator.clipboard.writeText(JSON.stringify(row.original, null, 2))
-              }
-            >
-              Copy row as JSON
-            </ContextMenuItem>
-            <ContextMenuItem
-              onClick={() => {
-                const cols = fields.map((f) => `"${f.name}"`).join(', ')
-                const vals = fields
-                  .map((f) => {
-                    const v = row.original[f.name]
-                    if (v === null) return 'NULL'
-                    if (typeof v === 'number') return String(v)
-                    return `'${String(v).replace(/'/g, "''")}'`
-                  })
-                  .join(', ')
-                navigator.clipboard.writeText(
-                  `INSERT INTO "${schema}"."${table}" (${cols}) VALUES (${vals});`
-                )
-              }}
-            >
-              Copy as SQL INSERT
-            </ContextMenuItem>
-            {onFilterByValue && rawValue !== null && (
-              <>
-                <ContextMenuSeparator />
-                <ContextMenuItem onClick={() => onFilterByValue(colId, displayValue)}>
-                  Filter by this value
-                </ContextMenuItem>
-              </>
-            )}
-          </ContextMenuContent>
-        </ContextMenu>
-      )
-    }
-  }))
+              {rawValue === null ? (
+                <span className="font-sans italic text-muted-foreground/40">NULL</span>
+              ) : currentSearch ? currentHighlight(displayValue) : displayValue}
+            </div>
+          )
+        }
+      })),
+    [fields, isEditable, handleCellContextMenu]
+  )
+
+  const coreRowModel = useMemo(() => getCoreRowModel(), [])
 
   const table_instance = useReactTable({
     data: rows,
     columns,
-    getCoreRowModel: getCoreRowModel(),
+    getCoreRowModel: coreRowModel,
     columnResizeMode: 'onChange'
   })
 
@@ -228,7 +219,7 @@ export function ResultsGrid({
     count: tableRows.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 26,
-    overscan: 20
+    overscan: 5
   })
 
   useEffect(() => {
@@ -279,6 +270,8 @@ export function ResultsGrid({
   const totalCols = columns.length + (hasSelection ? 1 : 0) + (canEdit ? 1 : 0)
 
   return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
     <div className="flex h-full flex-col overflow-hidden bg-background">
       <div className="flex h-7 shrink-0 items-center justify-between border-b border-border px-3">
         <span className="text-xs text-muted-foreground">
@@ -370,7 +363,7 @@ export function ResultsGrid({
                     key={row.id}
                     onClick={() => setInspectedRow(row.original, fields)}
                     className={cn(
-                      'cursor-pointer border-b border-border/40 transition-colors hover:bg-accent/50',
+                      'cursor-pointer border-b border-border/40 hover:bg-accent/50',
                       isEven && 'bg-muted/20',
                       hasPending && 'bg-amber-500/5 hover:bg-amber-500/10',
                       isSelected && 'bg-primary/8 hover:bg-primary/10'
@@ -419,5 +412,55 @@ export function ResultsGrid({
         </div>
       )}
     </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        {ctxTarget ? (
+          <>
+            <ContextMenuLabel>Cell — {ctxTarget.colId}</ContextMenuLabel>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              onClick={() => navigator.clipboard.writeText(ctxTarget.displayValue)}
+            >
+              Copy value
+            </ContextMenuItem>
+            <ContextMenuItem
+              onClick={() =>
+                navigator.clipboard.writeText(JSON.stringify(ctxTarget.rowData, null, 2))
+              }
+            >
+              Copy row as JSON
+            </ContextMenuItem>
+            <ContextMenuItem
+              onClick={() => {
+                const cols = fields.map((f) => `"${f.name}"`).join(', ')
+                const vals = fields
+                  .map((f) => {
+                    const v = ctxTarget.rowData[f.name]
+                    if (v === null) return 'NULL'
+                    if (typeof v === 'number') return String(v)
+                    return `'${String(v).replace(/'/g, "''")}'`
+                  })
+                  .join(', ')
+                navigator.clipboard.writeText(
+                  `INSERT INTO "${schema}"."${table}" (${cols}) VALUES (${vals});`
+                )
+              }}
+            >
+              Copy as SQL INSERT
+            </ContextMenuItem>
+            {onFilterByValue && ctxTarget.rawValue !== null && (
+              <>
+                <ContextMenuSeparator />
+                <ContextMenuItem onClick={() => onFilterByValue(ctxTarget.colId, ctxTarget.displayValue)}>
+                  Filter by this value
+                </ContextMenuItem>
+              </>
+            )}
+          </>
+        ) : (
+          <ContextMenuItem disabled>Right-click a cell</ContextMenuItem>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }
