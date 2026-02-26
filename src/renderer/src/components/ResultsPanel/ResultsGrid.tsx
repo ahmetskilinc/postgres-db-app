@@ -69,7 +69,8 @@ export function ResultsGrid({
   const [newRowValues, setNewRowValues] = useState<Record<string, unknown>>({})
   const parentRef = useRef<HTMLDivElement>(null)
 
-  const { setInspectedRow } = useAppStore()
+  const setInspectedRow = useAppStore((s) => s.setInspectedRow)
+  const inspectedRow = useAppStore((s) => s.inspectedRow)
   const isEditable = Boolean(connectionId && schema && table)
   const canEdit = isEditable && pendingEdits.size > 0
   const hasSelection = selectedRows !== undefined && onRowSelect !== undefined
@@ -370,7 +371,7 @@ export function ResultsGrid({
                 return (
                   <tr
                     key={row.id}
-                    onClick={() => setInspectedRow(row.original, fields)}
+                    onClick={() => inspectedRow?.row === row.original ? setInspectedRow(null) : setInspectedRow(row.original, fields)}
                     className={cn(
                       'cursor-pointer border-b border-border/40 transition-colors hover:bg-accent/50',
                       isEven && 'bg-muted/20',

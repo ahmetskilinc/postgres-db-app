@@ -1,4 +1,5 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+import type { ImperativePanelHandle } from 'react-resizable-panels'
 import { cn } from './lib/utils'
 import { useAppStore } from './store/useAppStore'
 import { ConnectionList } from './components/Sidebar/ConnectionList'
@@ -19,6 +20,26 @@ import { initAnalytics, setAnalyticsEnabled, trackEvent } from './lib/analytics'
 export default function App(): JSX.Element {
   const { theme, setTheme, setUpdaterState, openSettings, loadSettings, historyPanelOpen } =
     useAppStore()
+
+  const inspectedRow = useAppStore((s) => s.inspectedRow)
+  const activeTab = useAppStore((s) => s.tabs.find((t) => t.id === s.activeTabId))
+  const bottomPanelRef = useRef<ImperativePanelHandle>(null)
+
+  // Keep the bottom panel tight when there's nothing to inspect;
+  // expand it once a row is selected in table-browse mode.
+  useEffect(() => {
+    const panel = bottomPanelRef.current
+    if (!panel) return
+    const isTableMode = activeTab?.mode === 'table'
+    if (isTableMode && inspectedRow) {
+      // Only expand if the panel is still at the compact size
+      if (panel.getSize() < 25) {
+        panel.resize(40)
+      }
+    } else if (isTableMode && !inspectedRow) {
+      panel.resize(15)
+    }
+  }, [inspectedRow, activeTab?.mode])
 
   useEffect(() => {
     if (!window.api) return
@@ -110,7 +131,7 @@ export default function App(): JSX.Element {
                 <EditorTab />
               </ResizablePanel>
               <ResizableHandle />
-              <ResizablePanel defaultSize={45} minSize={10}>
+              <ResizablePanel ref={bottomPanelRef} defaultSize={45} minSize={10}>
                 <QueryResultPanel />
               </ResizablePanel>
             </ResizablePanelGroup>

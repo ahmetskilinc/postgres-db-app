@@ -54,7 +54,7 @@ module.exports = {
         xs: ['11px', '16px'],
         sm: ['12px', '18px'],
         base: ['13px', '20px']
-      }
+      },
     }
   },
   plugins: []
