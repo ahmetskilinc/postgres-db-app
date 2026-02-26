@@ -28,6 +28,7 @@ export interface AppSettings {
   theme: 'auto' | 'dark' | 'light'
   editorFontSize: number
   analyticsEnabled: boolean
+  preReleaseUpdates: boolean
 }
 
 interface StoreSchema {
@@ -44,7 +45,8 @@ export const store = new Store<StoreSchema>({
     settings: {
       theme: 'auto',
       editorFontSize: 13,
-      analyticsEnabled: true
+      analyticsEnabled: true,
+      preReleaseUpdates: false
     }
   }
 })
