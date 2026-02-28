@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo, memo } from 'react'
+import { useState, useCallback, useRef, useMemo, memo, useEffect } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useAppStore } from '../../store/useAppStore'
 import { Separator } from '../ui/separator'
@@ -47,8 +47,28 @@ export function SchemaTree(): JSX.Element {
 
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  const loadColumnsForTable = useCallback(
+    (connId: string, schema: string, tableName: string, key: string) => {
+      setLoadingCols((prev) => new Set(prev).add(key))
+      window.api.schema
+        .getColumns(connId, schema, tableName)
+        .then((cols) => cacheColumns(connId, schema, tableName, cols))
+        .catch((err) => {
+          console.error('Failed to load table columns', err)
+        })
+        .finally(() => {
+          setLoadingCols((prev) => {
+            const next = new Set(prev)
+            next.delete(key)
+            return next
+          })
+        })
+    },
+    [cacheColumns]
+  )
+
   const toggleTableExpanded = useCallback(
-    async (connId: string, schema: string, table: TableInfo) => {
+    (connId: string, schema: string, table: TableInfo) => {
       const key = `${schema}.${table.name}`
       setExpandedTables((prev) => {
         const next = new Set(prev)
@@ -60,24 +80,26 @@ export function SchemaTree(): JSX.Element {
         return next
       })
 
-      // Load columns if not yet cached
-      const cached =
-        useAppStore.getState().schemaStates[connId]?.columns[key]
+      const cached = useAppStore.getState().schemaStates[connId]?.columns[key]
       if (!cached) {
-        setLoadingCols((prev) => new Set(prev).add(key))
-        try {
-          const cols = await window.api.schema.getColumns(connId, schema, table.name)
-          cacheColumns(connId, schema, table.name, cols)
-        } finally {
-          setLoadingCols((prev) => {
-            const next = new Set(prev)
-            next.delete(key)
-            return next
-          })
-        }
+        loadColumnsForTable(connId, schema, table.name, key)
       }
     },
-    [cacheColumns]
+    [loadColumnsForTable]
+  )
+
+  const openTableAndExpand = useCallback(
+    (connId: string, schema: string, table: TableInfo) => {
+      openTableBrowser(connId, schema, table.name)
+      const key = `${schema}.${table.name}`
+      setExpandedTables((prev) => new Set(prev).add(key))
+
+      const cached = useAppStore.getState().schemaStates[connId]?.columns[key]
+      if (!cached) {
+        loadColumnsForTable(connId, schema, table.name, key)
+      }
+    },
+    [openTableBrowser, loadColumnsForTable]
   )
 
   // Build the flat list of virtual rows
@@ -217,6 +239,9 @@ export function SchemaTree(): JSX.Element {
                     onOpen={() =>
                       connectionId && openTableBrowser(connectionId, row.schema, row.table.name)
                     }
+                    onOpenAndExpand={() =>
+                      connectionId && openTableAndExpand(connectionId, row.schema, row.table)
+                    }
                   />
                 )}
                 {row.kind === 'column' && <ColumnRow col={row.col} />}
@@ -271,19 +296,41 @@ const TableRow = memo(function TableRow({
   isLoadingCols,
   onToggle,
   onOpen,
+  onOpenAndExpand,
 }: {
   table: TableInfo
   isExpanded: boolean
   isLoadingCols: boolean
   onToggle: () => void
   onOpen: () => void
+  onOpenAndExpand: () => void
 }) {
   const Icon = table.type === 'VIEW' || table.type === 'MATERIALIZED VIEW' ? Eye : Table2
+  const toggleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (toggleTimeoutRef.current) clearTimeout(toggleTimeoutRef.current)
+    }
+  }, [])
+
+  const handleClick = (): void => {
+    if (toggleTimeoutRef.current) {
+      clearTimeout(toggleTimeoutRef.current)
+      toggleTimeoutRef.current = null
+      onOpenAndExpand()
+      return
+    }
+    toggleTimeoutRef.current = setTimeout(() => {
+      toggleTimeoutRef.current = null
+      onToggle()
+    }, 250)
+  }
 
   return (
     <div className="group flex w-full items-center text-xs text-sidebar-foreground hover:bg-accent/50">
       <button
-        onClick={onToggle}
+        onClick={handleClick}
         className="flex flex-1 items-center gap-2 py-1 pl-7 pr-1 min-w-0"
       >
         <ChevronRight

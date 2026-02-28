@@ -84,6 +84,7 @@
       "out/**/*"
     ],
     "mac": {
+      "icon": "icon.icns",
       "target": [
         {
           "target": "dmg",
@@ -96,6 +97,7 @@
       "darkModeSupport": true
     },
     "win": {
+      "icon": "icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -106,6 +108,7 @@
       ]
     },
     "linux": {
+      "icon": "icon.png",
       "target": [
         "AppImage"
       ],
