@@ -56,6 +56,8 @@ interface AppState {
   setConnected: (id: string, connected: boolean) => void;
   addTab: (init?: Partial<EditorTab>) => string;
   closeTab: (id: string) => void;
+  closeAllTabs: () => void;
+  closeOtherTabs: (id: string) => void;
   setActiveTab: (id: string) => void;
   updateTab: (id: string, updates: Partial<EditorTab>) => void;
   setTheme: (theme: "dark" | "light") => void;
@@ -168,7 +170,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  setActiveTab: (id) => set({ activeTabId: id }),
+  closeAllTabs: () => {
+    const defaultTab = makeDefaultTab();
+    set({ tabs: [defaultTab], activeTabId: defaultTab.id });
+  },
+
+  closeOtherTabs: (id) => {
+    set((s) => {
+      const tab = s.tabs.find((t) => t.id === id);
+      if (!tab) return {};
+      return { tabs: [tab], activeTabId: id };
+    });
+  },
+
+  setActiveTab: (id) => set({ activeTabId: id, inspectedRow: null }),
 
   updateTab: (id, updates) => {
     set((s) => ({
@@ -212,18 +227,25 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   loadSchemas: async (connectionId) => {
     const schemas = await window.api.schema.getSchemas(connectionId);
+    const existingState = get().schemaStates[connectionId];
+    // Auto-expand if there's only one schema
+    const shouldAutoExpand = schemas.length === 1 && !existingState?.expandedSchemas?.length;
     set((s) => ({
       schemaStates: {
         ...s.schemaStates,
         [connectionId]: {
           schemas,
-          expandedSchemas: s.schemaStates[connectionId]?.expandedSchemas ?? [],
+          expandedSchemas: shouldAutoExpand ? [schemas[0]] : (s.schemaStates[connectionId]?.expandedSchemas ?? []),
           tables: s.schemaStates[connectionId]?.tables ?? {},
           loadingTables: [],
           columns: s.schemaStates[connectionId]?.columns ?? {},
         },
       },
     }));
+    // Load tables for the auto-expanded schema
+    if (shouldAutoExpand) {
+      get().loadTables(connectionId, schemas[0]);
+    }
   },
 
   toggleSchema: (connectionId, schema) => {
@@ -297,6 +319,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   openTableBrowser: (connectionId, schema, table) => {
+    // Check if a tab for this table already exists
+    const existingTab = get().tabs.find(
+      (t) =>
+        t.mode === "table" &&
+        t.tableMeta?.connectionId === connectionId &&
+        t.tableMeta?.schema === schema &&
+        t.tableMeta?.table === table
+    );
+    
+    if (existingTab) {
+      // Switch to existing tab
+      set({ activeTabId: existingTab.id });
+      return;
+    }
+    
+    // Create new tab
     const tabId = get().addTab({
       title: `${schema}.${table}`,
       mode: "table",
