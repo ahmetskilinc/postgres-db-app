@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useMemo, memo } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useAppStore } from '../../store/useAppStore'
 import { Separator } from '../ui/separator'
-import { ChevronRight, Loader2, Table2, Eye, KeyRound, Hash } from 'lucide-react'
+import { ChevronRight, Loader2, Table2, Eye, KeyRound, Hash, Link } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import type { TableInfo, ColumnInfo } from '../../types'
 
@@ -319,14 +319,21 @@ const TableRow = memo(function TableRow({
 /* ------------------------------------------------------------------ */
 
 const ColumnRow = memo(function ColumnRow({ col }: { col: ColumnInfo }) {
+  const hasFk = (col.foreignKeys?.length ?? 0) > 0
   return (
     <div className="flex items-center gap-2 py-0.5 pl-14 pr-3 text-2xs text-muted-foreground hover:bg-accent/30">
-      {col.isPrimary ? (
-        <KeyRound className="h-2.5 w-2.5 shrink-0 text-yellow-500 dark:text-yellow-400" />
-      ) : (
-        <Hash className="h-2.5 w-2.5 shrink-0 opacity-40" />
-      )}
-      <span className={cn('truncate', col.isPrimary && 'font-medium text-foreground/70')}>
+      <span className="flex shrink-0 items-center gap-0.5">
+        {col.isPrimary && (
+          <KeyRound className="h-2.5 w-2.5 text-yellow-500 dark:text-yellow-400" />
+        )}
+        {hasFk && (
+          <Link className="h-2.5 w-2.5 text-blue-500 dark:text-blue-400" />
+        )}
+        {!col.isPrimary && !hasFk && (
+          <Hash className="h-2.5 w-2.5 opacity-40" />
+        )}
+      </span>
+      <span className={cn('truncate', (col.isPrimary || hasFk) && 'font-medium text-foreground/70')}>
         {col.name}
       </span>
       <span className="ml-auto shrink-0 font-mono opacity-50">{col.type}</span>

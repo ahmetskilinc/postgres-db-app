@@ -234,6 +234,8 @@ export function CommandPalette(): JSX.Element {
                 </span>
                 <span className="shrink-0 text-2xs text-muted-foreground/50 font-mono">
                   {column.type}
+                  {column.isPrimary ? ' 🔑' : ''}
+                  {(column.foreignKeys?.length ?? 0) > 0 ? ' 🔗' : ''}
                 </span>
               </Command.Item>
             ))}

@@ -83,7 +83,7 @@ export function EditorTab(): JSX.Element {
               label: col.name,
               kind: monaco.languages.CompletionItemKind.Field,
               insertText: `"${col.name}"`,
-              detail: col.type + (col.isPrimary ? ' 🔑' : ''),
+              detail: col.type + (col.isPrimary ? ' 🔑' : '') + ((col.foreignKeys?.length ?? 0) > 0 ? ' 🔗' : ''),
               sortText: '2_' + col.name,
               range
             })
