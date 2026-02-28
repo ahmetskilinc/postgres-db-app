@@ -44,12 +44,19 @@ export interface TableInfo {
   type: 'TABLE' | 'VIEW' | 'MATERIALIZED VIEW'
 }
 
+export interface ForeignKeyRef {
+  schema: string
+  table: string
+  column: string
+}
+
 export interface ColumnInfo {
   name: string
   type: string
   nullable: boolean
   default: string | null
   isPrimary: boolean
+  foreignKeys?: ForeignKeyRef[]
 }
 
 export interface QueryHistoryEntry {
