@@ -6,12 +6,11 @@ import {
   type ColumnDef
 } from '@tanstack/react-table'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+
 import { ExportMenu } from './ExportMenu'
 import { useAppStore } from '../../store/useAppStore'
 import { cellValueToString, cn } from '../../lib/utils'
-import { Loader2, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
-import { toast } from '../../hooks/use-toast'
-import { trackEvent } from '../../lib/analytics'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -44,9 +43,15 @@ interface Props {
   onFilterByValue?: (col: string, value: string) => void
   pendingNewRow?: boolean
   onCancelNewRow?: () => void
-  onCommitNewRow?: (values: Record<string, unknown>) => Promise<void>
   searchTerm?: string
   scrollToRow?: number
+  // Lifted state for batch saving (optional for read-only query mode)
+  pendingEdits?: Map<string, Record<string, unknown>>
+  onPendingEditsChange?: (edits: Map<string, Record<string, unknown>>) => void
+  newRowValues?: Record<string, unknown>
+  onNewRowValuesChange?: (values: Record<string, unknown>) => void
+  // Select all
+  onSelectAll?: (checked: boolean) => void
 }
 
 interface EditState {
@@ -67,21 +72,21 @@ export function ResultsGrid({
   onFilterByValue,
   pendingNewRow,
   onCancelNewRow,
-  onCommitNewRow,
   searchTerm,
-  scrollToRow
+  scrollToRow,
+  pendingEdits = new Map(),
+  onPendingEditsChange,
+  newRowValues = {},
+  onNewRowValuesChange,
+  onSelectAll
 }: Props): JSX.Element {
-  const [pendingEdits, setPendingEdits] = useState<Map<string, Record<string, unknown>>>(new Map())
   const [editCell, setEditCell] = useState<EditState | null>(null)
-  const [savingRows, setSavingRows] = useState<Set<number>>(new Set())
-  const [newRowValues, setNewRowValues] = useState<Record<string, unknown>>({})
   const parentRef = useRef<HTMLDivElement>(null)
   const [ctxTarget, setCtxTarget] = useState<ContextMenuTarget | null>(null)
 
   const setInspectedRow = useAppStore((s) => s.setInspectedRow)
   const inspectedRow = useAppStore((s) => s.inspectedRow)
   const isEditable = Boolean(connectionId && schema && table)
-  const canEdit = isEditable && pendingEdits.size > 0
   const hasSelection = selectedRows !== undefined && onRowSelect !== undefined
 
   const normalizedSearch = useMemo(() => searchTerm?.toLowerCase() ?? '', [searchTerm])
@@ -164,12 +169,10 @@ export function ResultsGrid({
                 onBlur={(e) => {
                   const newVal = e.target.value
                   if (newVal !== cellValueToString(row.original[colId])) {
-                    setPendingEdits((prev) => {
-                      const next = new Map(prev)
-                      const existing = next.get(String(rowIdx)) ?? {}
-                      next.set(String(rowIdx), { ...existing, [colId]: newVal })
-                      return next
-                    })
+                    const next = new Map(pendingEditsRef.current)
+                    const existing = next.get(String(rowIdx)) ?? {}
+                    next.set(String(rowIdx), { ...existing, [colId]: newVal })
+                    onPendingEditsChange?.(next)
                   }
                   setEditCell(null)
                 }}
@@ -233,53 +236,37 @@ export function ResultsGrid({
   const virtualItems = rowVirtualizer.getVirtualItems()
   const totalSize = rowVirtualizer.getTotalSize()
 
-  const handleSaveRow = useCallback(
-    async (rowIdx: number) => {
-      if (!connectionId || !schema || !table) return
-      const updates = pendingEdits.get(String(rowIdx))
-      if (!updates) return
-      const row = rows[rowIdx]
-      const pks = await window.api.query.getPrimaryKeys(connectionId, schema, table)
-      if (pks.length === 0) {
-        toast({ title: 'No primary key', description: 'Cannot edit rows without a primary key.', variant: 'destructive' })
-        return
-      }
-      const pkValues = Object.fromEntries(pks.map((pk) => [pk, row[pk]]))
-      setSavingRows((p) => new Set(p).add(rowIdx))
-      try {
-        await window.api.query.updateRow({ connectionId, schema, table, primaryKeys: pks, pkValues, updates })
-        trackEvent('rows_updated', { count: 1 })
-        setPendingEdits((prev) => { const next = new Map(prev); next.delete(String(rowIdx)); return next })
-        toast({ title: 'Row updated' })
-      } catch (err) {
-        toast({ title: 'Update failed', description: (err as Error).message, variant: 'destructive' })
-      } finally {
-        setSavingRows((p) => { const next = new Set(p); next.delete(rowIdx); return next })
-      }
-    },
-    [connectionId, schema, table, rows, pendingEdits]
-  )
-
-  const handleDiscardRow = useCallback((rowIdx: number) => {
-    setPendingEdits((prev) => { const next = new Map(prev); next.delete(String(rowIdx)); return next })
-  }, [])
-
   const getSortIcon = (colName: string): JSX.Element => {
     if (!sortState || sortState.column !== colName) return <ArrowUpDown className="h-3 w-3 opacity-30" />
     if (sortState.dir === 'ASC') return <ArrowUp className="h-3 w-3 text-primary" />
     return <ArrowDown className="h-3 w-3 text-primary" />
   }
 
-  const totalCols = columns.length + (hasSelection ? 1 : 0) + (canEdit ? 1 : 0)
+  const totalCols = columns.length + (hasSelection ? 1 : 0)
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
     <div className="flex h-full flex-col overflow-hidden bg-background">
       <div className="flex h-7 shrink-0 items-center justify-between border-b border-border px-3">
-        <span className="text-xs text-muted-foreground">
-          {rows.length.toLocaleString()} rows
-        </span>
+        {onSelectAll && selectedRows ? (
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={selectedRows.size === rows.length && rows.length > 0}
+              ref={(el) => {
+                if (el) el.indeterminate = selectedRows.size > 0 && selectedRows.size < rows.length
+              }}
+              onChange={(e) => onSelectAll(e.target.checked)}
+              className="h-3 w-3 cursor-pointer rounded border-border accent-primary"
+            />
+            <span className="text-xs text-muted-foreground">
+              {selectedRows.size > 0 ? `${selectedRows.size} selected` : 'Select all'}
+            </span>
+          </label>
+        ) : (
+          <span />
+        )}
         {fields.length > 0 && <ExportMenu rows={rows} fields={fields} />}
       </div>
 
@@ -295,9 +282,6 @@ export function ResultsGrid({
                 <tr key={hg.id}>
                   {hasSelection && (
                     <th className="w-8 border-r border-border/60 px-2 py-1.5" />
-                  )}
-                  {canEdit && (
-                    <th className="w-16 border-r border-border/60 px-2 py-1.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground/50" />
                   )}
                   {hg.headers.map((header) => (
                     <th
@@ -323,27 +307,13 @@ export function ResultsGrid({
               {pendingNewRow && (
                 <tr className="border-b border-primary/40 bg-primary/5">
                   {hasSelection && <td className="w-8 border-r border-border/60" />}
-                  {canEdit && <td className="w-16 border-r border-border/60 px-1 py-0.5">
-                    <div className="flex gap-0.5">
-                      <button
-                        onClick={() => onCommitNewRow?.(newRowValues).then(() => setNewRowValues({}))}
-                        className="rounded px-1.5 py-0.5 text-2xs font-medium text-primary hover:bg-primary/10"
-                      >
-                        Insert
-                      </button>
-                      <button
-                        onClick={() => { onCancelNewRow?.(); setNewRowValues({}) }}
-                        className="rounded px-1 py-0.5 text-2xs text-muted-foreground hover:bg-accent"
-                      >✕</button>
-                    </div>
-                  </td>}
                   {fields.map((f) => (
                     <td key={f.name} className="border-r border-border/40 last:border-r-0">
                       <input
                         className="w-full bg-transparent px-2 py-0.5 font-mono text-xs outline-none placeholder:text-muted-foreground/40 focus:bg-primary/5"
                         placeholder={f.name}
                         value={newRowValues[f.name] !== undefined ? String(newRowValues[f.name]) : ''}
-                        onChange={(e) => setNewRowValues((v) => ({ ...v, [f.name]: e.target.value }))}
+                        onChange={(e) => onNewRowValuesChange?.({ ...newRowValues, [f.name]: e.target.value })}
                       />
                     </td>
                   ))}
@@ -357,7 +327,6 @@ export function ResultsGrid({
                 const row = tableRows[virtualRow.index]
                 const rowIdx = virtualRow.index
                 const hasPending = pendingEdits.has(String(rowIdx))
-                const isSaving = savingRows.has(rowIdx)
                 const isSelected = selectedRows?.has(rowIdx) ?? false
                 const isEven = rowIdx % 2 === 0
 
@@ -381,22 +350,6 @@ export function ResultsGrid({
                           onChange={(e) => onRowSelect?.(rowIdx, e.target.checked)}
                           className="h-3 w-3 cursor-pointer rounded border-border accent-primary"
                         />
-                      </td>
-                    )}
-                    {canEdit && (
-                      <td className="w-16 border-r border-border/60 px-1 py-0.5">
-                        {hasPending && (
-                          <div className="flex items-center gap-0.5">
-                            {isSaving ? (
-                              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                            ) : (
-                              <>
-                                <button onClick={() => handleSaveRow(rowIdx)} className="rounded px-1.5 py-0.5 text-2xs font-medium text-green-500 hover:bg-green-500/10">Save</button>
-                                <button onClick={() => handleDiscardRow(rowIdx)} className="rounded px-1 py-0.5 text-2xs text-muted-foreground hover:bg-accent">✕</button>
-                              </>
-                            )}
-                          </div>
-                        )}
                       </td>
                     )}
                     {row.getVisibleCells().map((cell) => (

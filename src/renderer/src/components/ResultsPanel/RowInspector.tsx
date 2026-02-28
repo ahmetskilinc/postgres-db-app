@@ -1,8 +1,9 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { useAppStore } from '../../store/useAppStore'
 import { X, Copy, Check, Braces, List } from 'lucide-react'
-import { cn, cellValueToString } from '../../lib/utils'
+
+import { useAppStore } from '../../store/useAppStore'
+import { cn, cellValueToString, pgTypeIdToName } from '../../lib/utils'
 import { toast } from '../../hooks/use-toast'
 
 type ViewMode = 'fields' | 'json'
@@ -147,10 +148,15 @@ export function RowInspector(): JSX.Element {
                           }}
                           className="group border-b border-border/40 hover:bg-accent/30"
                         >
-                          <td className="w-[160px] shrink-0 border-r border-border/40 px-3 py-1.5 align-top">
-                            <span className="text-2xs font-medium text-muted-foreground/70 font-mono">
-                              {field.name}
-                            </span>
+                          <td className="w-[200px] shrink-0 border-r border-border/40 px-3 py-1.5 align-top">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-2xs font-medium text-muted-foreground/70 font-mono">
+                                {field.name}
+                              </span>
+                              <span className="text-2xs text-muted-foreground/40 font-mono">
+                                {pgTypeIdToName(field.dataTypeID)}
+                              </span>
+                            </div>
                           </td>
                           <td className="px-3 py-1.5 align-top">
                             <div className="flex items-start justify-between gap-2">

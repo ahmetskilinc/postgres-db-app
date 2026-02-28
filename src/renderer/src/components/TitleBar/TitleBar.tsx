@@ -1,8 +1,16 @@
+import { Plus, X, Code2, Table2, Settings, Unplug, Clock } from 'lucide-react'
+
 import { useAppStore } from '../../store/useAppStore'
 import { Button } from '../ui/button'
-import { Plus, X, Code2, Table2, Settings, Unplug, Clock } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import type { EditorTab } from '../../store/useAppStore'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger
+} from '../ui/context-menu'
 
 export function TitleBar(): JSX.Element {
   const {
@@ -14,6 +22,8 @@ export function TitleBar(): JSX.Element {
     addTab,
     closeTab,
     setActiveTab,
+    closeAllTabs,
+    closeOtherTabs,
     disconnectFromDb,
     openConnectionDialog,
     openSettings,
@@ -70,6 +80,9 @@ export function TitleBar(): JSX.Element {
             isActive={tab.id === activeTabId}
             onActivate={() => setActiveTab(tab.id)}
             onClose={() => closeTab(tab.id)}
+            onCloseOthers={() => closeOtherTabs(tab.id)}
+            onCloseAll={closeAllTabs}
+            disableCloseOthers={tabs.length <= 1}
           />
         ))}
         <div className="titlebar-no-drag">
@@ -111,45 +124,61 @@ function Tab({
   tab,
   isActive,
   onActivate,
-  onClose
+  onClose,
+  onCloseOthers,
+  onCloseAll,
+  disableCloseOthers
 }: {
   tab: EditorTab
   isActive: boolean
   onActivate: () => void
   onClose: () => void
+  onCloseOthers: () => void
+  onCloseAll: () => void
+  disableCloseOthers: boolean
 }): JSX.Element {
   const Icon = tab.mode === 'table' ? Table2 : Code2
 
   return (
-    <div
-      className="titlebar-no-drag shrink-0"
-      onClick={onActivate}
-    >
-      <div
-        className={cn(
-          'group flex h-7 max-w-[180px] cursor-default items-center gap-1.5 rounded px-2.5 text-xs transition-colors select-none',
-          isActive
-            ? 'bg-accent text-foreground'
-            : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
-        )}
-      >
-        <Icon className="h-3 w-3 shrink-0 opacity-60" />
-        <span className="truncate max-w-[120px]">{tab.title}</span>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onClose()
-          }}
-          className={cn(
-            'ml-auto flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
-            isActive
-              ? 'opacity-50 hover:opacity-100'
-              : 'opacity-0 group-hover:opacity-50 hover:!opacity-100'
-          )}
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          className="titlebar-no-drag shrink-0"
+          onClick={onActivate}
         >
-          <X className="h-2.5 w-2.5" />
-        </button>
-      </div>
-    </div>
+          <div
+            className={cn(
+              'group flex h-7 max-w-[180px] cursor-default items-center gap-1.5 rounded px-2.5 text-xs transition-colors select-none',
+              isActive
+                ? 'bg-accent text-foreground'
+                : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+            )}
+          >
+            <Icon className="h-3 w-3 shrink-0 opacity-60" />
+            <span className="truncate max-w-[120px]">{tab.title}</span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onClose()
+              }}
+              className={cn(
+                'ml-auto flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+                isActive
+                  ? 'opacity-50 hover:opacity-100'
+                  : 'opacity-0 group-hover:opacity-50 hover:!opacity-100'
+              )}
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          </div>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onSelect={onClose}>Close</ContextMenuItem>
+        <ContextMenuItem onSelect={onCloseOthers} disabled={disableCloseOthers}>Close Others</ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={onCloseAll}>Close All</ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }

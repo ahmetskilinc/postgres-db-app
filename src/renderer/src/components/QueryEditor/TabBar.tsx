@@ -1,6 +1,8 @@
+
+import { Plus, X, Table2, Code2 } from 'lucide-react'
+
 import { useAppStore } from '../../store/useAppStore'
 import { Button } from '../ui/button'
-import { Plus, X, Table2, Code2 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
 export function TabBar(): JSX.Element {

@@ -1,19 +1,26 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useHotkey } from '@tanstack/react-hotkeys'
+import { ChevronLeft, ChevronRight, Loader2, RefreshCw, Plus, Trash2, Filter, X, Search, Database, Save, AlertTriangle } from 'lucide-react'
+
+import { trackEvent } from '../../lib/analytics'
 import { useAppStore, type EditorTab } from '../../store/useAppStore'
 import { ResultsGrid, type SortState } from './ResultsGrid'
 import { Button } from '../ui/button'
-import { ChevronLeft, ChevronRight, Loader2, RefreshCw, Plus, Trash2, Filter, X, Search, Database } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem
 } from '../ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription
+} from '../ui/dialog'
 import { toast } from '../../hooks/use-toast'
 import { cn } from '../../lib/utils'
-import type { TableData } from '../../types'
-import { trackEvent } from '../../lib/analytics'
 
 type FilterMode = 'query' | 'search'
 
@@ -41,7 +48,14 @@ export function TableBrowser({ tab }: { tab: EditorTab }): JSX.Element {
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
   const [pendingNewRow, setPendingNewRow] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [showRefreshDialog, setShowRefreshDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const filterRef = useRef<HTMLInputElement>(null)
+
+  // Lifted state for batch saving
+  const [pendingEdits, setPendingEdits] = useState<Map<string, Record<string, unknown>>>(new Map())
+  const [newRowValues, setNewRowValues] = useState<Record<string, unknown>>({})
 
   // Refs for mutable state — avoids stale closure bugs in async flows
   const pageRef = useRef(page)
@@ -87,6 +101,11 @@ export function TableBrowser({ tab }: { tab: EditorTab }): JSX.Element {
 
   useEffect(() => {
     if (!tab.tableData) fetchPage(0, null, '')
+  }, [tab.id])
+
+  // Clear row selection when switching between tabs (but keep pending edits)
+  useEffect(() => {
+    setSelectedRows(new Set())
   }, [tab.id])
 
   useEffect(() => {
@@ -196,8 +215,11 @@ export function TableBrowser({ tab }: { tab: EditorTab }): JSX.Element {
       runSearch(filterInput)
       return
     }
-    setActiveFilter(filterInput)
-    fetchPage(0, sortRef.current, filterInput)
+    // Strip leading WHERE if user typed it (backend adds WHERE automatically)
+    const cleanFilter = filterInput.replace(/^\s*where\s+/i, '')
+    setActiveFilter(cleanFilter)
+    setFilterInput(cleanFilter)
+    fetchPage(0, sortRef.current, cleanFilter)
   }
 
   const handleClearFilter = (): void => {
@@ -267,23 +289,29 @@ export function TableBrowser({ tab }: { tab: EditorTab }): JSX.Element {
     })
   }
 
-  const handleSelectAll = (): void => {
+  const handleSelectAll = (checked: boolean): void => {
     const data = tab.tableData
     if (!data) return
-    if (selectedRows.size === data.rows.length) {
-      setSelectedRows(new Set())
-    } else {
+    if (checked) {
       setSelectedRows(new Set(data.rows.map((_, i) => i)))
+    } else {
+      setSelectedRows(new Set())
     }
   }
 
-  const handleDeleteSelected = async (): Promise<void> => {
+  const handleDeleteSelected = (): void => {
+    if (!tab.tableData || selectedRows.size === 0) return
+    setShowDeleteDialog(true)
+  }
+
+  const confirmDelete = async (): Promise<void> => {
     const data = tab.tableData
     if (!data || selectedRows.size === 0) return
 
     const pks = await window.api.query.getPrimaryKeys(meta.connectionId, meta.schema, meta.table)
     if (pks.length === 0) {
       toast({ title: 'No primary key', description: 'Cannot delete rows without a primary key.', variant: 'destructive' })
+      setShowDeleteDialog(false)
       return
     }
 
@@ -292,6 +320,7 @@ export function TableBrowser({ tab }: { tab: EditorTab }): JSX.Element {
     )
 
     setDeleting(true)
+    setShowDeleteDialog(false)
     try {
       const result = await window.api.query.deleteRows({
         connectionId: meta.connectionId,
@@ -304,6 +333,7 @@ export function TableBrowser({ tab }: { tab: EditorTab }): JSX.Element {
         count: result.deleted
       })
       toast({ title: `Deleted ${result.deleted} row${result.deleted !== 1 ? 's' : ''}` })
+      setSelectedRows(new Set())
       fetchPage(page)
     } catch (err) {
       toast({ title: 'Delete failed', description: (err as Error).message, variant: 'destructive' })
@@ -312,24 +342,109 @@ export function TableBrowser({ tab }: { tab: EditorTab }): JSX.Element {
     }
   }
 
-  const handleCommitNewRow = async (values: Record<string, unknown>): Promise<void> => {
+  const hasPendingChanges = pendingNewRow || pendingEdits.size > 0
+
+  const handleSaveAll = async (): Promise<void> => {
+    const data = tab.tableData
+    if (!data) return
+
+    setSaving(true)
+    let insertedCount = 0
+    let updatedCount = 0
+    const errors: string[] = []
+
     try {
-      await window.api.query.insertRow({
-        connectionId: meta.connectionId,
-        schema: meta.schema,
-        table: meta.table,
-        values
-      })
-      trackEvent('row_inserted', {
-        fieldCount: Object.keys(values).length
-      })
-      toast({ title: 'Row inserted' })
-      setPendingNewRow(false)
-      fetchPage(page)
-    } catch (err) {
-      toast({ title: 'Insert failed', description: (err as Error).message, variant: 'destructive' })
-      throw err
+      // 1. Insert new row if pending
+      if (pendingNewRow && Object.keys(newRowValues).length > 0) {
+        try {
+          await window.api.query.insertRow({
+            connectionId: meta.connectionId,
+            schema: meta.schema,
+            table: meta.table,
+            values: newRowValues
+          })
+          insertedCount = 1
+          trackEvent('row_inserted', { fieldCount: Object.keys(newRowValues).length })
+        } catch (err) {
+          errors.push(`Insert: ${(err as Error).message}`)
+        }
+      }
+
+      // 2. Update edited rows
+      if (pendingEdits.size > 0) {
+        const pks = await window.api.query.getPrimaryKeys(meta.connectionId, meta.schema, meta.table)
+        if (pks.length === 0 && pendingEdits.size > 0) {
+          errors.push('Cannot update rows without a primary key.')
+        } else {
+          for (const [rowIdxStr, updates] of pendingEdits.entries()) {
+            const rowIdx = parseInt(rowIdxStr, 10)
+            const row = data.rows[rowIdx]
+            if (!row) continue
+            const pkValues = Object.fromEntries(pks.map((pk) => [pk, row[pk]]))
+            try {
+              await window.api.query.updateRow({
+                connectionId: meta.connectionId,
+                schema: meta.schema,
+                table: meta.table,
+                primaryKeys: pks,
+                pkValues,
+                updates
+              })
+              updatedCount++
+            } catch (err) {
+              errors.push(`Row ${rowIdx + 1}: ${(err as Error).message}`)
+            }
+          }
+          if (updatedCount > 0) {
+            trackEvent('rows_updated', { count: updatedCount })
+          }
+        }
+      }
+
+      // Clear state and refresh
+      if (errors.length === 0) {
+        setPendingNewRow(false)
+        setNewRowValues({})
+        setPendingEdits(new Map())
+        const parts: string[] = []
+        if (insertedCount > 0) parts.push(`${insertedCount} inserted`)
+        if (updatedCount > 0) parts.push(`${updatedCount} updated`)
+        toast({ title: `Saved: ${parts.join(', ')}` })
+        fetchPage(page)
+      } else {
+        toast({ title: 'Some changes failed', description: errors.join('; '), variant: 'destructive' })
+        // Still refresh to show what succeeded
+        fetchPage(page)
+      }
+    } finally {
+      setSaving(false)
     }
+  }
+
+  const handleDiscardAll = (): void => {
+    setPendingNewRow(false)
+    setNewRowValues({})
+    setPendingEdits(new Map())
+  }
+
+  const handleRefresh = (): void => {
+    if (hasPendingChanges) {
+      setShowRefreshDialog(true)
+    } else {
+      fetchPage(page)
+    }
+  }
+
+  const handleRefreshDiscard = (): void => {
+    handleDiscardAll()
+    setShowRefreshDialog(false)
+    fetchPage(page)
+  }
+
+  const handleRefreshSave = async (): Promise<void> => {
+    await handleSaveAll()
+    setShowRefreshDialog(false)
+    // handleSaveAll already calls fetchPage on success
   }
 
   const tableData = tab.tableData
@@ -343,6 +458,30 @@ export function TableBrowser({ tab }: { tab: EditorTab }): JSX.Element {
         <span className="text-xs font-medium text-muted-foreground shrink-0">
           {meta.schema}.{meta.table}
         </span>
+        {hasPendingChanges && (
+          <>
+            <Button
+              variant="default"
+              size="sm"
+              className="h-6 gap-1.5"
+              onClick={handleSaveAll}
+              disabled={saving}
+            >
+              {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+              Save{pendingEdits.size > 0 || pendingNewRow ? ` (${pendingEdits.size + (pendingNewRow ? 1 : 0)})` : ''}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 gap-1.5"
+              onClick={handleDiscardAll}
+              disabled={saving}
+            >
+              <X className="h-3 w-3" />
+              Discard
+            </Button>
+          </>
+        )}
         <div className="flex-1" />
         {selectedRows.size > 0 && (
           <Button
@@ -360,7 +499,7 @@ export function TableBrowser({ tab }: { tab: EditorTab }): JSX.Element {
           variant="ghost"
           size="sm"
           className="h-6 gap-1.5"
-          onClick={() => setPendingNewRow(true)}
+          onClick={() => { setPendingNewRow(true); setSelectedRows(new Set()) }}
           disabled={pendingNewRow}
         >
           <Plus className="h-3 w-3" />
@@ -370,17 +509,12 @@ export function TableBrowser({ tab }: { tab: EditorTab }): JSX.Element {
           variant="ghost"
           size="icon"
           className="h-6 w-6"
-          onClick={() => fetchPage(page)}
+          onClick={handleRefresh}
           disabled={loading}
           title="Refresh"
         >
           {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
         </Button>
-        {tableData && (
-          <span className="text-xs text-muted-foreground shrink-0">
-            {tableData.total.toLocaleString()} rows
-          </span>
-        )}
       </div>
 
       {/* Filter bar */}
@@ -427,7 +561,7 @@ export function TableBrowser({ tab }: { tab: EditorTab }): JSX.Element {
           ref={filterRef}
           className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/50"
           placeholder={filterMode === 'query'
-            ? "WHERE  e.g. email LIKE '%@gmail.com' or id > 100"
+            ? "column name = 'value' (e.g. id > 100 or name = 'john')"
             : 'Search across all cells...'
           }
           value={filterInput}
@@ -508,24 +642,6 @@ export function TableBrowser({ tab }: { tab: EditorTab }): JSX.Element {
         )}
       </div>
 
-      {/* Select all bar — shown when rows exist */}
-      {tableData && tableData.rows.length > 0 && (
-        <div className="flex h-6 shrink-0 items-center gap-2 border-b border-border/50 bg-muted/10 px-3">
-          <input
-            type="checkbox"
-            checked={selectedRows.size === tableData.rows.length && tableData.rows.length > 0}
-            ref={(el) => {
-              if (el) el.indeterminate = selectedRows.size > 0 && selectedRows.size < tableData.rows.length
-            }}
-            onChange={handleSelectAll}
-            className="h-3 w-3 cursor-pointer rounded border-border accent-primary"
-          />
-          <span className="text-2xs text-muted-foreground">
-            {selectedRows.size > 0 ? `${selectedRows.size} selected` : 'Select all'}
-          </span>
-        </div>
-      )}
-
       {/* Grid */}
       <div className="flex-1 overflow-hidden">
         {tableData ? (
@@ -541,10 +657,14 @@ export function TableBrowser({ tab }: { tab: EditorTab }): JSX.Element {
             onSort={handleSort}
             onFilterByValue={handleFilterByValue}
             pendingNewRow={pendingNewRow}
-            onCancelNewRow={() => setPendingNewRow(false)}
-            onCommitNewRow={handleCommitNewRow}
+            onCancelNewRow={() => { setPendingNewRow(false); setNewRowValues({}) }}
             searchTerm={searchTerm}
             scrollToRow={scrollToRow}
+            pendingEdits={pendingEdits}
+            onPendingEditsChange={setPendingEdits}
+            newRowValues={newRowValues}
+            onNewRowValuesChange={setNewRowValues}
+            onSelectAll={handleSelectAll}
           />
         ) : (
           <div className="flex h-full items-center justify-center">
@@ -567,6 +687,58 @@ export function TableBrowser({ tab }: { tab: EditorTab }): JSX.Element {
           </Button>
         </div>
       )}
+
+      {/* Refresh confirmation dialog */}
+      <Dialog open={showRefreshDialog} onOpenChange={setShowRefreshDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              Unsaved Changes
+            </DialogTitle>
+            <DialogDescription>
+              You have {pendingEdits.size + (pendingNewRow ? 1 : 0)} unsaved change{(pendingEdits.size + (pendingNewRow ? 1 : 0)) !== 1 ? 's' : ''}. 
+              What would you like to do before refreshing?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" size="sm" onClick={() => setShowRefreshDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleRefreshDiscard}>
+              Discard & Refresh
+            </Button>
+            <Button size="sm" onClick={handleRefreshSave} disabled={saving}>
+              {saving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+              Save & Refresh
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              Delete {selectedRows.size} row{selectedRows.size !== 1 ? 's' : ''}?
+            </DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. The selected row{selectedRows.size !== 1 ? 's' : ''} will be permanently deleted from the database.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" size="sm" onClick={() => setShowDeleteDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" size="sm" onClick={confirmDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

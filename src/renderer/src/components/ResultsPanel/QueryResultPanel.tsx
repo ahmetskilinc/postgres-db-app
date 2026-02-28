@@ -3,6 +3,7 @@ import { ResultsGrid } from './ResultsGrid'
 import { RowInspector } from './RowInspector'
 import { AlertCircle, Clock, Loader2 } from 'lucide-react'
 import { formatDuration } from '../../lib/utils'
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '../ui/resizable'
 
 export function QueryResultPanel(): JSX.Element {
   const { tabs, activeTabId, inspectedRow } = useAppStore()
@@ -38,7 +39,7 @@ export function QueryResultPanel(): JSX.Element {
     )
   }
 
-  // In query mode with results, show inspector if a row is selected, otherwise show grid
+  // In query mode with results, show grid and inspector side by side when row selected
   if (activeTab.result) {
     const { result } = activeTab
 
@@ -59,7 +60,17 @@ export function QueryResultPanel(): JSX.Element {
     }
 
     if (inspectedRow) {
-      return <RowInspector />
+      return (
+        <ResizablePanelGroup direction="horizontal" className="h-full">
+          <ResizablePanel defaultSize={65} minSize={30}>
+            <ResultsGrid rows={result.rows} fields={result.fields} />
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={35} minSize={20}>
+            <RowInspector />
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      )
     }
 
     return <ResultsGrid rows={result.rows} fields={result.fields} />
